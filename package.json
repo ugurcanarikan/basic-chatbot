@@ -1,0 +1,23 @@
+{
+  "name": "chatapp",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "express": "^4.16.3",
+    "react": "^15.6.1",
+    "react-dom": "^15.6.1",
+    "react-scripts": "1.0.11",
+    "request": "^2.88.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "client": "npm start",
+    "server": "cd src && nodemon server.js",
+    "dev": "concurrently --kill-others-on-fail \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^3.6.1",
+    "request-promise": "^4.2.2"
+  },
+  "proxy": "http://localhost:3001"
+}
