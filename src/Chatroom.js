@@ -31,8 +31,10 @@ class Chatroom extends React.Component {
     async submitMessage(e) {
         e.preventDefault();
         const message = ReactDOM.findDOMNode(this.refs.msg).value;
-        await this.callFlowAPI(message);
-        this.setState({
+        if(this.state.flow.value === null){
+            await this.callFlowAPI(message);
+        }
+        await this.setState({
             chats: this.state.chats.concat([{                       // concatanate new message to the chat
                 username: "user",
                 content: <p>{message}</p>,
@@ -61,7 +63,6 @@ class Chatroom extends React.Component {
     async respond(message){
         this.callResponseAPI(message)
         .then(body => {
-            console.log(body);
             this.setState({
                 chats: this.state.chats.concat([{                       // concatanate new message to the chat
                     username: "bot",
@@ -70,10 +71,10 @@ class Chatroom extends React.Component {
             }, () => {
                 ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
             });
-            if(body.endOfFlow === "true"){
+            if(body.endOfFlow === true){
                 this.setState({
                     flow: {value: null, length: 0}
-                });
+                });         
             }
         });
     }

@@ -14,14 +14,14 @@ app.get('/response/*', async (req, res) => {
     var message = paramArray[0];
     var flowValue = paramArray[1];
     var flowLenght = parseInt(paramArray[2]);
-    var endOfFLow = true;
+    var endOfFlow = true;
     console.log("incoming message : " + message);
     console.log("incoming flow value : " + flowValue);
     console.log("incoming flow length : " + flowLenght);
     var flow = {value : ""};
     await getFlow(message, flow);
     var response = "";
-    if(flow.value === "currency"){
+    if(flowValue === "currency"){
         var currency = {eur : "", usd : "", code : 0};
         await getCurrency(currency);
         if(currency.code === 200){
@@ -32,34 +32,54 @@ app.get('/response/*', async (req, res) => {
             response = "Error while getting the currency exchange rates";
         }
     }
-    else if(flow.value === "weather"){
+    else if(flowValue === "weather"){
         if(flowLenght === 1){
             response = "Which city would you like to know?";
-            endOfFLow = false;
+            endOfFlow = false;
         }
         else if(flowLenght === 2){
             var url = await getCityUrl(message);
             var weather = {city: message, code: 0};
-            await getWeather(url, message);
+            await getWeather(url, weather);
             if(weather.code === 200){
-                response = "Weather in " + state.weather.city + " is " + state.weather.main + " with " +
-                    state.weather.description + ". \nTemperature is " + state.weather.temp + 
-                    "Celcius. \n" + "Humidity is " + state.weather.humidity + " % . \n" + 
-                    "Pressure is " + state.weather.pressure + " bar";
+                response = "Weather in " + weather.city + " is " + weather.main + " with " +
+                    weather.description + ". \nTemperature is " + weather.temp + 
+                    "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" + 
+                    "Pressure is " + weather.pressure + " bar";
             }
-            else{
+            else if(weather.code === 404){
                 response = "Error while getting the weather for " + message;
             }
         }
     }
+    else if(flowValue === "affirm"){
+        response = "Thanks";
+    }
+    else if(flowValue === "greet"){
+        response = "Hi";
+    }
+    else if(flowValue === "thank"){
+        response = "You are welcome";
+    }
+    else if(flowValue === "smalltalk"){
+        response = "I'm fine, thanks";
+    }
+    else if(flowValue === "goodbye"){
+        response = "goodbye"
+    }
+    else{
+        response = "Cannot understand your message";
+    }
     console.log("Determined response: " + response);
-    res.send({response : response, endOfFLow: endOfFLow.toString()});
+    console.log("End of flow: " + endOfFlow);
+    console.log("************");
+    res.send({response : response, endOfFlow: endOfFlow});
 })
 
 app.get('/flow/*', async (req, res) => {
     var message = req.params[0];
     console.log("incoming message : " + message);
-    var flow = {value : ""};
+    var flow = {value : null};
     await getFlow(message, flow);
     res.send({flow : flow.value});
 })
@@ -80,16 +100,15 @@ function getCityUrl(message) {
 }
 
 async function getWeather(url, weather) {
+    console.log("Connecting to " + url + "to get the weather");
     await rp(url).then(body => {
         var b = JSON.parse(body);
-        console.log(b);
         weather.code = 200;
         weather.main = b.weather[0].main;
         weather.description = b.weather[0].description;
         weather.temp = b.main.temp - 273.15;
         weather.humidity = b.main.humidity;
         weather.pressure = b.main.pressure;
-        return weather;
     }).catch((err) => {
         weather.code = 404;
         console.log("Error getting the weather in the getWeather function in customActions.js")
@@ -129,7 +148,6 @@ async function getCurrency(currency) {
     console.log("Connecting to " + url + " to get EUR exchange rates");
     await rp(url).then(body => {
         var b = JSON.parse(body);
-        console.log(b);
         return b;
     }).then(b => {
         currency.code = 200;
@@ -143,7 +161,6 @@ async function getCurrency(currency) {
     console.log("Connecting to " + url2 + " to get USD exchange rates");
     await rp(url2).then(body => {
         var b = JSON.parse(body);
-        console.log(b);
         return b;
     }).then(b => {
         currency.code = 200;
@@ -162,13 +179,11 @@ async function askNLU(message, flow) {
 
     await rp(url).then(body => {
         var b = JSON.parse(body);
-        console.log(b);
         return b;
     }).then(b => {
         if (b.intent.confidence >= 0.3) {
             flow.value = b.intent.name;
         }
-        return flow;
     }).catch(err => {
         console.log(err);
     });
