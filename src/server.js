@@ -67,6 +67,13 @@ app.get('/response/*', async (req, res) => {
     else if(flowValue === "goodbye"){
         response = "goodbye"
     }
+    else if(flowValue === "frustration"){
+        response = "I am sorry I couldn't be more helpful"
+    }
+    else if(flowValue === "insult"){
+        response = "That is not a nice thing to say. Besides, if you don't like my service, " +
+                    "you can simply go fuck yourself!";
+    }
     else{
         response = "Cannot understand your message";
     }
@@ -100,7 +107,7 @@ function getCityUrl(message) {
 }
 
 async function getWeather(url, weather) {
-    console.log("Connecting to " + url + "to get the weather");
+    console.log("Connecting to " + url + " to get the weather");
     await rp(url).then(body => {
         var b = JSON.parse(body);
         weather.code = 200;
@@ -171,7 +178,6 @@ async function getCurrency(currency) {
         console.log(err);
     });
 }
-
 
 async function askNLU(message, flow) {
     var url = "http://localhost:5000/parse?q=" + message;
