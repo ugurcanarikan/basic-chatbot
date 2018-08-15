@@ -1,7 +1,7 @@
 import React from 'react';
 
-const Message = ({chat, user}) => (
-    <li className={`chat ${user === chat.username ? "right" : "left"}`}>
+const Message = ({chat}) => (
+    <li className={`chat ${chat.username !== "bot" ? "right" : "left"}`}>
         {chat.content}
     </li>
 );

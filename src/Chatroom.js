@@ -9,7 +9,8 @@ class Chatroom extends React.Component {
         super(props);
 
         this.state = {
-            chats: []
+            chats: [],
+            flow : {value: null, length: 0}
         };
 
         this.submitMessage = this.submitMessage.bind(this);
@@ -27,39 +28,53 @@ class Chatroom extends React.Component {
         ReactDOM.findDOMNode(this.refs.chats).scrollTop = ReactDOM.findDOMNode(this.refs.chats).scrollHeight;
     }
 
-    submitMessage(e) {
+    async submitMessage(e) {
         e.preventDefault();
         const message = ReactDOM.findDOMNode(this.refs.msg).value;
-        this.respond(message);
-        
+        await this.callFlowAPI(message);
         this.setState({
             chats: this.state.chats.concat([{                       // concatanate new message to the chat
-                username: "You",
+                username: "user",
                 content: <p>{message}</p>,
-            }])
+            }]),
+            flow: {value: this.state.flow.value, length: this.state.flow.length + 1}
         }, () => {
             ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
         });
+        this.respond(message);
     }
 
-    async callAPI(message){
-        const res = await fetch('/' + message);
+    async callFlowAPI(message){
+        const res = await fetch('/flow/' + message);
         const body = await res.json();
-        return body.response;
+        this.setState({
+            flow: {value: body.flow, length: this.state.flow.length} 
+        });
+    }
+
+    async callResponseAPI(message){
+        const res = await fetch('/response/' + message + '&' + this.state.flow.value + '&' + this.state.flow.length);
+        const body = await res.json();
+        return body;
     } 
 
     async respond(message){
-        this.callAPI(message)
-        .then(res => {
-            console.log(res);
+        this.callResponseAPI(message)
+        .then(body => {
+            console.log(body);
             this.setState({
                 chats: this.state.chats.concat([{                       // concatanate new message to the chat
-                    username: "You",
-                    content: <p>{res}</p>,
+                    username: "bot",
+                    content: <p>{body.response}</p>,
                 }])
             }, () => {
                 ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
             });
+            if(body.endOfFlow === "true"){
+                this.setState({
+                    flow: {value: null, length: 0}
+                });
+            }
         });
     }
 
@@ -68,7 +83,7 @@ class Chatroom extends React.Component {
 
         return (
             <div className="chatroom">
-                <h3>Cahtbot</h3>
+                <h3>Chatbot</h3>
                 <ul className="chats" ref="chats">
                     {
                         chats.map((chat) => 

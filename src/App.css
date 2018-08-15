@@ -74,6 +74,11 @@ p {
   clear: both;
 }
 
+.chatroom .chats .chat.left {
+  float: left;
+  clear: both;
+}
+
 .chatroom .chats .chat a {
   text-decoration: none;
   color:#3498DB;
