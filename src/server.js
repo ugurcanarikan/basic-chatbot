@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const rp = require('request-promise');
+var readXlsxFile = require('../node_modules/read-excel-file/node');
 
 const app = express();
 const port = process.env.port || 3001;
@@ -194,3 +195,16 @@ async function askNLU(message, flow) {
         console.log(err);
     });
 }
+
+function readExcel(){
+    readXlsxFile('/home/stajyer/Downloads/Financial-Sample.xlsx').then((rows) => {
+        console.log(rows[2]);
+    }).catch(err => {
+        console.log(err);
+    })
+}
+
+//TODO read from an excel file and train the NLU with Q/As
+app.get('/excel', (req, res)=>{
+    readExcel();
+})
