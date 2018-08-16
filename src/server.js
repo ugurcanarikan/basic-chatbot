@@ -196,15 +196,39 @@ async function askNLU(message, flow) {
     });
 }
 
-function readExcel(){
-    readXlsxFile('/home/stajyer/Downloads/Financial-Sample.xlsx').then((rows) => {
-        console.log(rows[2]);
-    }).catch(err => {
-        console.log(err);
+/**
+ * Reads an excel file in the .xlsx format. File's location is given in the function
+ * Excel file is then transformed to an array of objects
+ * Excel file is assumed to have below format:
+ * row1:    [file header]
+ * row2:    [row of field names]
+ * row3:    [rows of fields]
+ * Example:
+ *          faq
+ *          questions | answers
+ *          q1        | a1
+ *          q2        | a2  
+ */
+async function readExcel(file, location){
+    await readXlsxFile(location).then((rows) => {
+        var numOfFields = rows[1].length;
+        for(let i = 0; i < rows.length; i++){
+            file[i] = {};
+        }
+        for(let i = 2; i < rows.length; i++){
+            for(j = 0; j < numOfFields; j++){
+                file[i - 2][rows[1][j]] = rows[i][j];
+            }
+        }
+        }).catch(err => {
+        console.log("Error:" + err);
     })
 }
 
 //TODO read from an excel file and train the NLU with Q/As
-app.get('/excel', (req, res)=>{
-    readExcel();
+app.get('/excel', async (req, res)=>{
+    var file = {};
+    var location = "/home/stajyer/Documents/faq2.xlsx";
+    await readExcel(file, location);
+    console.log(file);
 })
