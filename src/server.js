@@ -2,6 +2,9 @@ const express = require('express');
 const path = require('path');
 const rp = require('request-promise');
 var readXlsxFile = require('../node_modules/read-excel-file/node');
+var multer  = require('multer');
+const UPLOAD_DESTINATION = "uploads/";
+var upload = multer({ dest: UPLOAD_DESTINATION });
 
 const app = express();
 const port = process.env.port || 3001;
@@ -90,6 +93,19 @@ app.get('/flow/*', async (req, res) => {
     var flow = {value : null};
     await getFlow(message, flow);
     res.send({flow : flow.value});
+})
+
+app.post('/upload/',upload.single('file'), async (req, res) => {
+    var file = {};
+    readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
+        var length = Object.keys(file).length;
+        for(var i = 0; i < length; i++){
+            console.log(file[i]);
+        }
+    }).catch(err => {
+        console.log(err);
+    })
+    res.send("SUCCESS");
 })
 
 async function getFlow(message, flow){
@@ -212,16 +228,16 @@ async function askNLU(message, flow) {
 async function readExcel(file, location){
     await readXlsxFile(location).then((rows) => {
         var numOfFields = rows[1].length;
-        for(let i = 0; i < rows.length; i++){
+        for(let i = 0; i < rows.length - 2; i++){
             file[i] = {};
         }
         for(let i = 2; i < rows.length; i++){
-            for(j = 0; j < numOfFields; j++){
+            for(let j = 0; j < numOfFields; j++){
                 file[i - 2][rows[1][j]] = rows[i][j];
             }
         }
         }).catch(err => {
-        console.log("Error:" + err);
+            console.log("Error reading excel file: " + err);
     })
 }
 

@@ -20,7 +20,7 @@ p {
 
 .chatroom {
   width: 360px;
-  height: 600px;
+  height: 640px;
   background-color: rgba(0,0,0, .7);
   border-radius: 5px;
   overflow: hidden;
@@ -123,4 +123,20 @@ p {
 .chatroom .input input[type="submit"]:hover {
   background: #1EE494;
   color: #FFF;
+}
+
+/*   */
+
+.chatroom .input input[type="file"] {
+  content: "Upload files to train your chatbot";
+  outline: 0;
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+  margin-left: 10px;
+  height: 30px;
+  width: 270px;
+  box-sizing: border-box;
+  font-size: 14px;
+  cursor: pointer;
+  overflow: hidden;
 }
