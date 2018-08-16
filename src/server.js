@@ -1,9 +1,12 @@
 const express = require('express');
 const path = require('path');
 const rp = require('request-promise');
-var readXlsxFile = require('../node_modules/read-excel-file/node');
-var multer  = require('multer');
+const fs = require('fs');
+
+const readXlsxFile = require('../node_modules/read-excel-file/node');
+const multer  = require('multer');
 const UPLOAD_DESTINATION = "uploads/";
+const TRAINING_DESTINATION = "training/";
 var upload = multer({ dest: UPLOAD_DESTINATION });
 
 const app = express();
@@ -98,15 +101,27 @@ app.get('/flow/*', async (req, res) => {
 app.post('/upload/',upload.single('file'), async (req, res) => {
     var file = {};
     readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
-        var length = Object.keys(file).length;
-        for(var i = 0; i < length; i++){
-            console.log(file[i]);
-        }
+        trainNLU(file);
+        res.send("SUCCESS");
     }).catch(err => {
         console.log(err);
+        res.send(err);
     })
-    res.send("SUCCESS");
 })
+
+function trainNLU(file){
+    fs.writeFile(TRAINING_DESTINATION + "train.yml", "language: \"en\"\npipeline: \"spacy_sklearn\"\n"); 
+    fs.appendFile(TRAINING_DESTINATION + "train.yml", "data: {\n\t\"rasa_nlu_data\": {\n\t\t\"common_examples\": [\n"); 
+    var length = Object.keys(file).length;
+    for(i = 0; i < length; i++){
+        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t{\n");
+        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"text\": \"" + file[i].q + "\",\n");
+        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"intent\": \"" + file[i].a + "\",\n");
+        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"entities\": []\n\t\t\t}\n");
+    }
+    fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t]\n\t\}\n}"); 
+    
+}
 
 async function getFlow(message, flow){
     console.log("Determining the flow of the message");
@@ -228,12 +243,12 @@ async function askNLU(message, flow) {
 async function readExcel(file, location){
     await readXlsxFile(location).then((rows) => {
         var numOfFields = rows[1].length;
-        for(let i = 0; i < rows.length - 2; i++){
+        for(let i = 0; i < rows.length - 1; i++){
             file[i] = {};
         }
-        for(let i = 2; i < rows.length; i++){
+        for(let i = 1; i < rows.length; i++){
             for(let j = 0; j < numOfFields; j++){
-                file[i - 2][rows[1][j]] = rows[i][j];
+                file[i - 1][rows[1][j]] = rows[i][j];
             }
         }
         }).catch(err => {
