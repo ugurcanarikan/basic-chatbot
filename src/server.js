@@ -100,27 +100,51 @@ app.get('/flow/*', async (req, res) => {
 
 app.post('/upload/',upload.single('file'), async (req, res) => {
     var file = {};
-    readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
-        trainNLU(file);
-        res.send("SUCCESS");
+    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
+        await formTrainFile(file);
+        await trainNLU(file).then(response => {
+            res.send({statusCode: response.response.statusCode, statusMessage: response.response.statusMessage});
+        }).catch(err => {
+            console.log(err);
+            res.send(err);
+        });
     }).catch(err => {
         console.log(err);
-        res.send(err);
-    })
+        res.send({statusCode: err.response.statusCode, statusMessage: err.response.statusMessage});
+    });
 })
 
-function trainNLU(file){
-    fs.writeFile(TRAINING_DESTINATION + "train.yml", "language: \"en\"\npipeline: \"spacy_sklearn\"\n"); 
-    fs.appendFile(TRAINING_DESTINATION + "train.yml", "data: {\n\t\"rasa_nlu_data\": {\n\t\t\"common_examples\": [\n"); 
+function formTrainFile(file){
+    var fileContents = "language: \"en\"\npipeline: \"spacy_sklearn\"\n\n" ;
+    fileContents = fileContents + "data: {\n\t\"rasa_nlu_data\": {\n\t\t\"common_examples\": [\n\n"
     var length = Object.keys(file).length;
     for(i = 0; i < length; i++){
-        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t{\n");
-        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"text\": \"" + file[i].q + "\",\n");
-        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"intent\": \"" + file[i].a + "\",\n");
-        fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t\t\t\"entities\": []\n\t\t\t}\n");
+        fileContents = fileContents + "\t\t\t{\n";
+        fileContents = fileContents + "\t\t\t\t\"text\": \"" + file[i].q + "\",\n";
+        fileContents = fileContents + "\t\t\t\t\"intent\": \"" + file[i].a + "\",\n";
+        fileContents = fileContents + "\t\t\t\t\"entities\": []\n\t\t\t}\n";
     }
-    fs.appendFile(TRAINING_DESTINATION + "train.yml", "\t\t]\n\t\}\n}"); 
-    
+    fileContents = fileContents + "\t\t]\n\t\}\n}";
+    fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
+        if(err){
+            console.log("Error creating the training file");
+            console.log(err);
+        }
+    });   
+}
+
+async function trainNLU(){
+    var url = "http://localhost:5000/train?d=" + TRAINING_DESTINATION + "train.yml";
+    var header = "Content-Type: application/x-yml"
+    console.log("training NLU unit at " + url);
+
+    await rp({url: url, header: header}).then(body => {
+        var b = JSON.parse(body);
+        return b;
+    }).catch(err => {
+        console.log("Error while training NLU");
+        console.log(err);
+    });
 }
 
 async function getFlow(message, flow){

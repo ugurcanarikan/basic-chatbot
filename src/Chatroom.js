@@ -31,21 +31,37 @@ class Chatroom extends React.Component {
         ReactDOM.findDOMNode(this.refs.chats).scrollTop = ReactDOM.findDOMNode(this.refs.chats).scrollHeight;
     }
 
+    say(message, person){
+        if(person === "user"){
+            this.setState({
+                chats: this.state.chats.concat([{                       // concatanate new message to the chat
+                    username: person,
+                    content: <p>{message}</p>,
+                }]),
+                flow: {value: this.state.flow.value, length: this.state.flow.length + 1}        
+            }, () => {
+                ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
+            });
+        }
+        else if(person === "bot"){
+            this.setState({
+                chats: this.state.chats.concat([{                       // concatanate new message to the chat
+                    username: person,
+                    content: <p>{message}</p>,
+                }]),
+            }, () => {
+                ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
+            });
+        }
+    }
+
     async submitMessage(e) {
         e.preventDefault();
         const message = ReactDOM.findDOMNode(this.refs.msg).value;
         if(this.state.flow.value === null){
             await this.callFlowAPI(message);
         }
-        await this.setState({
-            chats: this.state.chats.concat([{                       // concatanate new message to the chat
-                username: "user",
-                content: <p>{message}</p>,
-            }]),
-            flow: {value: this.state.flow.value, length: this.state.flow.length + 1}
-        }, () => {
-            ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
-        });
+        await this.say(message, "user")
         this.respond(message);
     }
 
@@ -74,15 +90,8 @@ class Chatroom extends React.Component {
     } 
 
     async respond(message){
-        Axios.get('/response/' + message + '&' + this.state.flow.value + '&' + this.state.flow.length).then(response => {
-            this.setState({
-                chats: this.state.chats.concat([{                       // concatanate new message to the chat
-                    username: "bot",
-                    content: <p>{response.data.response}</p>,
-                }])
-            }, () => {
-                ReactDOM.findDOMNode(this.refs.msg).value = "";         // reset the message input
-            });
+        Axios.get('/response/' + message + '&' + this.state.flow.value + '&' + this.state.flow.length).then(async response => {
+            await this.say(response.data.response, "bot");
             if(response.data.endOfFlow === true){
                 this.setState({
                     flow: {value: null, length: 0}
@@ -104,15 +113,26 @@ class Chatroom extends React.Component {
         const data = new FormData();
         data.append('file', this.uploadInput.files[0]);
         data.append('name', this.uploadInput.files[0].name);
+        this.say("I am starting my training now. Please wait", "bot");
         Axios.post('/upload/', data, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
-          }).then(res => {
-            console.log(res);
-        }).catch(err => {
-            console.log("Error uploading the file " + err);
-        });
+            }).then(res => {
+                console.log(res);
+                if(res.statusCode === 200){
+                    this.say("I have completed my training", "bot");
+                }
+                else{
+                    this.say("I could not complete my training." + 
+                       " To see a list of errors, open console by pressing F12", "bot");
+                       console.log(res.statusMessage);
+                }
+            }).catch(err => {
+                this.say("I could not complete my training." + 
+                       " To see a list of errors, open console by pressing F12", "bot");
+                console.log("Error uploading the file " + err);
+            });
     }
 
     render() {
