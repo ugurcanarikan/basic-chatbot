@@ -7,6 +7,7 @@ const readXlsxFile = require('../node_modules/read-excel-file/node');
 const multer  = require('multer');
 const UPLOAD_DESTINATION = "uploads/";
 const TRAINING_DESTINATION = "training/";
+const ABSOLUTE_TRAINING_PATH = "/home/stajyer/Documents/react-chatapp-master/src/training/train.yml";
 var upload = multer({ dest: UPLOAD_DESTINATION });
 
 const app = express();
@@ -122,7 +123,7 @@ function formTrainFile(file){
         fileContents = fileContents + "\t\t\t{\n";
         fileContents = fileContents + "\t\t\t\t\"text\": \"" + file[i].q + "\",\n";
         fileContents = fileContents + "\t\t\t\t\"intent\": \"" + file[i].a + "\",\n";
-        fileContents = fileContents + "\t\t\t\t\"entities\": []\n\t\t\t}\n";
+        fileContents = fileContents + "\t\t\t\t\"entities\": []\n\t\t\t},\n";
     }
     fileContents = fileContents + "\t\t]\n\t\}\n}";
     fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
@@ -134,11 +135,18 @@ function formTrainFile(file){
 }
 
 async function trainNLU(){
-    var url = "http://localhost:5000/train?d=" + TRAINING_DESTINATION + "train.yml";
-    var header = "Content-Type: application/x-yml"
+    var url = "http://localhost:5000/train?project=default&d=" + ABSOLUTE_TRAINING_PATH;
+    var options = {
+        method: 'POST',
+        url: url,
+        headers: {'Content-Type': 'application/x-yml'},
+        encoding: 'utf8', 
+        //Accept: 'application/json',
+        //json: true // Automatically stringifies the body to JSON
+    };
     console.log("training NLU unit at " + url);
 
-    await rp({url: url, header: header}).then(body => {
+    await rp(options).then(body => {
         var b = JSON.parse(body);
         return b;
     }).catch(err => {
