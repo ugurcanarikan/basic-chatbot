@@ -79,8 +79,7 @@ app.get('/response/*', async (req, res) => {
         response = "I am sorry I couldn't be more helpful"
     }
     else if(flowValue === "insult"){
-        response = "That is not a nice thing to say. Besides, if you don't like my service, " +
-                    "you can simply go fuck yourself!";
+        response = "That is not a nice thing to say";
     }
     else{
         response = "Cannot understand your message";
