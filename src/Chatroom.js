@@ -111,28 +111,36 @@ class Chatroom extends React.Component {
     async submitUpload(e){
         e.preventDefault();
         const data = new FormData();
-        data.append('file', this.uploadInput.files[0]);
-        data.append('name', this.uploadInput.files[0].name);
-        this.say("I am starting my training now. Please wait", "bot");
+        try{
+            console.log(this.uploadInput.files[0]);
+            data.append('file', this.uploadInput.files[0]);
+            data.append('name', this.uploadInput.files[0].name);
+        }catch(err){
+            await this.say("There was an error uploading the file, please try again", "bot");
+            await this.say("You can view the detailed error in the console by pressing F12", "bot");
+            console.log(err);
+            return;
+        }
+        await this.say("I am starting my training now. Please wait", "bot");
         Axios.post('/upload/', data, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
-            }).then(res => {
+            }).then(async res => {
                 console.log(res);
-                if(res.statusCode === 200){
+                if(res.data.statusCode === 200){
                     this.say("I have completed my training", "bot");
                 }
                 else{
-                    this.say("I could not complete my training." + 
-                       " To see a list of errors, open console by pressing F12", "bot");
-                       console.log(res.statusMessage);
+                    await this.say("I could not complete my training due to an error on NLU." + 
+                    " To see a list of errors, open console by pressing F12", "bot");
                 }
-            }).catch(err => {
-                this.say("I could not complete my training." + 
-                       " To see a list of errors, open console by pressing F12", "bot");
+            }).catch(async err => {
+                await this.say("I could not complete my training." + 
+                    " To see a list of errors, open console by pressing F12", "bot");
                 console.log("Error uploading the file " + err);
             });
+        
     }
 
     render() {
@@ -152,7 +160,7 @@ class Chatroom extends React.Component {
                     <input type="submit" value="Submit" />
                 </form>
                 <form className="input" onSubmit={e => this.submitUpload(e)}>
-                    <input ref={(ref) => { this.uploadInput = ref; }} type="file" name="file" onChange={e => this.handleUpload(e)}/>
+                    <input ref={(ref) => { this.uploadInput = ref; }} type="file" name="file" />
                     <input type="submit" value="Upload" />
                 </form>
             </div>

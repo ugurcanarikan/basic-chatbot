@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const rp = require('request-promise');
 const fs = require('fs');
+const request = require('request');
 
 const readXlsxFile = require('../node_modules/read-excel-file/node');
 const multer  = require('multer');
@@ -14,8 +15,24 @@ const app = express();
 const port = process.env.port || 3001;
 
 
-
-app.listen(port, () => console.log("Server listenning on port " + port))
+app.listen(port, async () => {
+    s = {};
+    console.log("Starting initial training");
+    await readTextFile("file:/home/stajyer/Documents/react-chatapp-master/src/rasa/default_training.yml", s);
+    console.log(s.text);
+    await trainNLU(s).then(response => {
+        if(response.statusCode === 200){
+            res.send({statusCode: response.statusCode});
+        }
+        else{
+            res.send({statusCode: response.statusCode});
+        }
+    }).catch(err => {
+        console.log(err);
+        res.send(err);
+    });
+    console.log("Server listenning on port " + port)
+});
 
 app.get('/response/*', async (req, res) => {
     var paramArray = req.params[0].split('&');
@@ -104,28 +121,56 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
     await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
         await formTrainFile(file);
         await trainNLU(file).then(response => {
-            res.send({statusCode: response.response.statusCode, statusMessage: response.response.statusMessage});
+            if(response.statusCode === 200){
+                res.send({statusCode: response.statusCode});
+            }
+            else{
+                res.send({statusCode: response.statusCode});
+            }
         }).catch(err => {
             console.log(err);
             res.send(err);
         });
     }).catch(err => {
         console.log(err);
-        res.send({statusCode: err.response.statusCode, statusMessage: err.response.statusMessage});
+        res.send({statusCode: err.statusCode});
     });
 })
 
 function formTrainFile(file){
-    var fileContents = "language: \"en\"\npipeline: \"spacy_sklearn\"\n\n" ;
-    fileContents = fileContents + "data: {\n\t\"rasa_nlu_data\": {\n\t\t\"common_examples\": [\n\n"
+    var fileContents = "language: \"en\" \n\n";
+    fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
+    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n"
     var length = Object.keys(file).length;
     for(i = 0; i < length; i++){
-        fileContents = fileContents + "\t\t\t{\n";
-        fileContents = fileContents + "\t\t\t\t\"text\": \"" + file[i].q + "\",\n";
-        fileContents = fileContents + "\t\t\t\t\"intent\": \"" + file[i].a + "\",\n";
-        fileContents = fileContents + "\t\t\t\t\"entities\": []\n\t\t\t},\n";
+        fileContents = fileContents + "      {\n";
+        fileContents = fileContents + "        \"text\": \"" + file[i].q + "\",\n";
+        fileContents = fileContents + "        \"intent\": \"" + file[i].a + "\",\n";
+        fileContents = fileContents + "        \"entities\": []\n      },\n";
     }
-    fileContents = fileContents + "\t\t]\n\t\}\n}";
+    fileContents = fileContents + "    ]\n  \}\n}";
+    fileContents = encode_utf8(fileContents);
+    fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
+        if(err){
+            console.log("Error creating the training file");
+            console.log(err);
+        }
+    }); 
+    file.text = fileContents;  
+}
+
+function formTrainFile2(file){
+    var fileContents = "language: \'en\' ";
+    fileContents = fileContents + "pipeline: \'spacy_sklearn\' " ;
+    fileContents = fileContents + "data: {\'rasa_nlu_data\': {\'common_examples\': [";
+    var length = Object.keys(file).length;
+    for(i = 0; i < length; i++){
+        fileContents = fileContents + "\'text\': \'" + file[i].q + "\',";
+        fileContents = fileContents + "\'intent\': \'" + file[i].a + "\',";
+        fileContents = fileContents + "\'entities\': []},";
+    }
+    fileContents = fileContents + "]}}";
+    fileContents = encode_utf8(fileContents);
     fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
         if(err){
             console.log("Error creating the training file");
@@ -134,25 +179,33 @@ function formTrainFile(file){
     });   
 }
 
-async function trainNLU(){
-    var url = "http://localhost:5000/train?project=default&d=" + ABSOLUTE_TRAINING_PATH;
-    var options = {
+async function trainNLU(file){
+    console.log(file.text);
+    var res = {};
+    var options = { 
         method: 'POST',
-        url: url,
-        headers: {'Content-Type': 'application/x-yml'},
-        encoding: 'utf8', 
-        //Accept: 'application/json',
-        //json: true // Automatically stringifies the body to JSON
+        url: 'http://localhost:5000/train?project=default',
+        qs: { project: 'default' },
+        headers: 
+        { 
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/x-yml' },
+        body: file.text,
+        resolveWithFullResponse: true
     };
-    console.log("training NLU unit at " + url);
-
-    await rp(options).then(body => {
-        var b = JSON.parse(body);
-        return b;
-    }).catch(err => {
-        console.log("Error while training NLU");
-        console.log(err);
+    /*await request(options, function (error, response) {
+        if (error) throw new Error(error);
+        res = response;
     });
+    console.log(res);
+    Promise.resolve(res);*/
+    await rp(options).then(response => {
+        res = response;
+        return response;
+    }).catch(err => {
+        console.log(err);
+    })
+    return res;
 }
 
 async function getFlow(message, flow){
@@ -275,12 +328,12 @@ async function askNLU(message, flow) {
 async function readExcel(file, location){
     await readXlsxFile(location).then((rows) => {
         var numOfFields = rows[1].length;
-        for(let i = 0; i < rows.length - 1; i++){
+        for(let i = 0; i < rows.length - 2; i++){
             file[i] = {};
         }
-        for(let i = 1; i < rows.length; i++){
+        for(let i = 2; i < rows.length; i++){
             for(let j = 0; j < numOfFields; j++){
-                file[i - 1][rows[1][j]] = rows[i][j];
+                file[i - 2][rows[1][j]] = rows[i][j];
             }
         }
         }).catch(err => {
@@ -288,10 +341,36 @@ async function readExcel(file, location){
     })
 }
 
-//TODO read from an excel file and train the NLU with Q/As
-app.get('/excel', async (req, res)=>{
-    var file = {};
-    var location = "/home/stajyer/Documents/faq2.xlsx";
-    await readExcel(file, location);
-    console.log(file);
-})
+function encode_utf8( s ){
+    return unescape( encodeURIComponent( s ) );
+}( '\u4e0a\u6d77' )
+
+function readTextFile(file, s){
+    var rawFile = new XMLHttpRequest();
+    rawFile.open("GET", file, false);
+    rawFile.onreadystatechange = function ()
+    {
+        if(rawFile.readyState === 4)
+        {
+            if(rawFile.status === 200 || rawFile.status == 0)
+            {
+                var allText = rawFile.responseText;
+                s.text = allText;
+            }
+        }
+    }
+    console.log(s.text);
+    rawFile.send(null);
+}
+function readFile(filePath, s){
+    fs.readFile(filePath, {encoding: 'utf-8'}, function(err,data){
+        if (!err) {
+            console.log('received data: ' + data);
+            response.writeHead(200, {'Content-Type': 'text/html'});
+            response.write(data);
+            response.end();
+        } else {
+            console.log(err);
+        }
+    });
+}
