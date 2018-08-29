@@ -16,7 +16,7 @@ const port = process.env.port || 3001;
 
 
 app.listen(port, async () => {
-    s = {};
+    /*s = {};
     console.log("Starting initial training");
     await readTextFile("file:/home/stajyer/Documents/react-chatapp-master/src/rasa/default_training.yml", s);
     console.log(s.text);
@@ -28,9 +28,9 @@ app.listen(port, async () => {
             res.send({statusCode: response.statusCode});
         }
     }).catch(err => {
-        console.log(err);
+        console.error(err);
         res.send(err);
-    });
+    });*/
     console.log("Server listenning on port " + port)
 });
 
@@ -96,8 +96,10 @@ app.get('/response/*', async (req, res) => {
         response = "I am sorry I couldn't be more helpful"
     }
     else if(flowValue === "insult"){
-        response = "That is not a nice thing to say. Besides, if you don't like my service, " +
-                    "you can simply go fuck yourself!";
+        response = "That is not a nice thing to say";
+    }
+    else if(flowValue !== null){
+        response = flowValue;
     }
     else{
         response = "Cannot understand your message";
@@ -128,11 +130,11 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
                 res.send({statusCode: response.statusCode});
             }
         }).catch(err => {
-            console.log(err);
+            console.error(err);
             res.send(err);
         });
     }).catch(err => {
-        console.log(err);
+        console.error(err);
         res.send({statusCode: err.statusCode});
     });
 })
@@ -152,8 +154,8 @@ function formTrainFile(file){
     fileContents = encode_utf8(fileContents);
     fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
         if(err){
-            console.log("Error creating the training file");
-            console.log(err);
+            console.error("Error creating the training file");
+            console.error(err);
         }
     }); 
     file.text = fileContents;  
@@ -173,8 +175,8 @@ function formTrainFile2(file){
     fileContents = encode_utf8(fileContents);
     fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
         if(err){
-            console.log("Error creating the training file");
-            console.log(err);
+            console.error("Error creating the training file");
+            console.error(err);
         }
     });   
 }
@@ -184,8 +186,8 @@ async function trainNLU(file){
     var res = {};
     var options = { 
         method: 'POST',
-        url: 'http://localhost:5000/train?project=default',
-        qs: { project: 'default' },
+        url: 'http://localhost:5000/train?project=current',
+        qs: { project: 'current' },
         headers: 
         { 
             'Cache-Control': 'no-cache',
@@ -203,7 +205,7 @@ async function trainNLU(file){
         res = response;
         return response;
     }).catch(err => {
-        console.log(err);
+        console.error(err);
     })
     return res;
 }
@@ -235,8 +237,8 @@ async function getWeather(url, weather) {
         weather.pressure = b.main.pressure;
     }).catch((err) => {
         weather.code = 404;
-        console.log("Error getting the weather in the getWeather function in customActions.js")
-        console.log(err);
+        console.error("Error getting the weather in the getWeather function in customActions.js")
+        console.error(err);
     });
 }
 
@@ -279,7 +281,7 @@ async function getCurrency(currency) {
         console.log("1 euro = " + currency.eur);
     }).catch(err => {
         currency.code = 404;
-        console.log(err);
+        console.error(err);
     });
     var url2 = "http://free.currencyconverterapi.com/api/v5/convert?q=USD_TRY&compact=y";
     console.log("Connecting to " + url2 + " to get USD exchange rates");
@@ -292,12 +294,12 @@ async function getCurrency(currency) {
         console.log("1 dollar = " + currency.usd);
     }).catch(err => {
         currency.code = 404;
-        console.log(err);
+        console.error(err);
     });
 }
 
 async function askNLU(message, flow) {
-    var url = "http://localhost:5000/parse?q=" + message;
+    /*var url = "http://localhost:5000/parse?q=" + message + "&project=current";
     console.log("Connecting to NLU unit at " + url);
 
     await rp(url).then(body => {
@@ -308,7 +310,28 @@ async function askNLU(message, flow) {
             flow.value = b.intent.name;
         }
     }).catch(err => {
-        console.log(err);
+        console.error(err);
+    });*/
+    //var dataString = "{\"q\": \"" + message + "\", \"project\": \"current\", \"model\": \"nlu\"}";
+    var dataString = "{\"q\": \"" + message + "\", \"project\": \"current\", \"model\": \"nlu\"}";
+
+    console.log(dataString);
+    var options = {
+        url: 'http://localhost:5000/parse',
+        method: 'POST',
+        body: dataString,
+        //resolveWithFullResponse: true
+    };
+    await rp(options).then(body => {
+        var b = JSON.parse(body);
+        console.log(b);
+        return b;
+    }).then(b => {
+        if (b.intent.confidence >= 0.3) {
+            flow.value = b.intent.name;
+        }
+    }).catch(err => {
+        console.error(err);
     });
 }
 
@@ -337,7 +360,7 @@ async function readExcel(file, location){
             }
         }
         }).catch(err => {
-            console.log("Error reading excel file: " + err);
+            console.error("Error reading excel file: " + err);
     })
 }
 
@@ -370,7 +393,7 @@ function readFile(filePath, s){
             response.write(data);
             response.end();
         } else {
-            console.log(err);
+            console.error(err);
         }
     });
 }
