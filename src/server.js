@@ -8,6 +8,7 @@ const readXlsxFile = require('../node_modules/read-excel-file/node');
 const multer  = require('multer');
 const UPLOAD_DESTINATION = "uploads/";
 const TRAINING_DESTINATION = "training/";
+const OLD_TRAINING_PATH = "training/old_training.txt";
 const ABSOLUTE_TRAINING_PATH = "/home/stajyer/Documents/react-chatapp-master/src/training/train.yml";
 var upload = multer({ dest: UPLOAD_DESTINATION });
 
@@ -142,14 +143,23 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
 function formTrainFile(file){
     var fileContents = "language: \"en\" \n\n";
     fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
-    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n"
+    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+    var append = fs.readFile(OLD_TRAINING_PATH, "utf8", err => {console.error(err);});
+    fileContents = fileContents + append;
     var length = Object.keys(file).length;
     for(i = 0; i < length; i++){
-        fileContents = fileContents + "      {\n";
+        var newIntent = "      {\n" + "        \"text\": \"" + file[i].q + "\",\n" + "        \"intent\": \"" + file[i].a + "\",\n" + "        \"entities\": []\n      },\n";
+        /*fileContents = fileContents + "      {\n";
         fileContents = fileContents + "        \"text\": \"" + file[i].q + "\",\n";
         fileContents = fileContents + "        \"intent\": \"" + file[i].a + "\",\n";
-        fileContents = fileContents + "        \"entities\": []\n      },\n";
-    }
+        fileContents = fileContents + "        \"entities\": []\n      },\n";*/
+        fileContents = fileContents + newIntent;
+        fs.appendFile(OLD_TRAINING_PATH, newIntent, err => {
+            console.error(err);
+        });
+
+    };
+    
     fileContents = fileContents + "    ]\n  \}\n}";
     fileContents = encode_utf8(fileContents);
     fs.writeFile(TRAINING_DESTINATION + "train.yml", fileContents, function(err){
