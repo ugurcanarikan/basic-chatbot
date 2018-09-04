@@ -1,0 +1,20 @@
+      {
+        "text": "Where is Bogazici South Campus",
+        "intent": "It is in Bebek",
+        "entities": []
+      },
+      {
+        "text": "Where is Bogazici",
+        "intent": "It is in Bebek",
+        "entities": []
+      },
+      {
+        "text": "Where is GSL",
+        "intent": "It is in Beyoglu",
+        "entities": []
+      },
+      {
+        "text": "Where is GSL situated",
+        "intent": "It is in Beyoglu",
+        "entities": []
+      },
