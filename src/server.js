@@ -111,6 +111,10 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
     })
 })
 
+/**
+ * Trains the nlu unit given the contents of the file
+ * @param {*} file contents that the nlu will be trained with
+ */
 async function train(file){
     res = {};
     var fileContents = "language: \"en\" \n\n";
@@ -157,6 +161,9 @@ async function train(file){
     return res;
 }
 
+/**
+ * Starts the initial training of the nlu each time chatbot has started
+ */
 async function initialTraining(){
     var fileContents = "language: \"en\" \n\n";
     fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
@@ -190,6 +197,10 @@ async function initialTraining(){
     }); 
 }
 
+/**
+ * Makes the request that trains the nlu given the training file
+ * @param {*} file file that holds the contents that the nlu will be trained
+ */
 async function trainNLU(file){
     file.text = encode_utf8(file.text);
     var res = {};
@@ -214,12 +225,21 @@ async function trainNLU(file){
     return res;
 }
 
+/**
+ * Determines the flow of the given message
+ * @param {*} message message of the user
+ * @param {*} flow object to hold the determined flow
+ */
 async function getFlow(message, flow){
     console.log("Determining the flow of the message");
     await askNLU(message, flow);
     console.log("Determined Flow : " + flow.value);
 }
 
+/**
+ * Determines the url of the weather stats of the given city
+ * @param {*} message message of the user which is expected to be a city
+ */
 function getCityUrl(message) {
     var city = message.charAt(0).toUpperCase() + message.slice(1);
     city = city.replace(/\s+/g, '');
@@ -229,6 +249,11 @@ function getCityUrl(message) {
     return url;
 }
 
+/**
+ * Makes a request to the given url and holds the resulting weather stats in weather object
+ * @param {*} url url to make the request
+ * @param {*} weather object to hold the weather stats
+ */
 async function getWeather(url, weather) {
     console.log("Connecting to " + url + " to get the weather");
     await rp(url).then(body => {
@@ -273,6 +298,10 @@ function getDate() {
     return year + "-" + month + "-" + day;
 }
 
+/**
+ * Determines the current currency rates making requests
+ * @param {*} currency to hold the currency rates
+ */
 async function getCurrency(currency) {
     var url = "http://free.currencyconverterapi.com/api/v5/convert?q=EUR_TRY&compact=y";
     console.log("Connecting to " + url + " to get EUR exchange rates");
@@ -302,6 +331,11 @@ async function getCurrency(currency) {
     });
 }
 
+/**
+ * Determines the flow of the given message asking NLU unit at port 5000 by making a POST request
+ * @param {*} message input message
+ * @param {*} flow object to hold the determined flow 
+ */
 async function askNLU(message, flow) {
     var dataString = "{\"q\": \"" + message + "\", \"project\": \"current\"}";
 
@@ -327,7 +361,7 @@ async function askNLU(message, flow) {
 
 /**
  * Reads an excel file in the .xlsx format. File's location is given in the function
- * Excel file is then transformed to an array of objects
+ * Excel file is then transformed to an array of q/a objects
  * Excel file is assumed to have below format:
  * row1:    [file header]
  * row2:    [row of field names]
@@ -336,7 +370,10 @@ async function askNLU(message, flow) {
  *          faq
  *          questions | answers
  *          q1        | a1
- *          q2        | a2  
+ *          q2        | a2 
+ * output: [{questions:q1, answers:a1}, {questions:q2, answers:a2}]
+ * @param {*} file file to hold the resulting array of objects
+ * @param {*} location path of the xlsx file
  */
 async function readExcel(file, location){
     await readXlsxFile(location).then((rows) => {
