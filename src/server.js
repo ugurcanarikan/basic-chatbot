@@ -6,7 +6,7 @@ const request = require('request');
 
 const readXlsxFile = require('../node_modules/read-excel-file/node');
 const multer  = require('multer');
-const UPLOAD_DESTINATION = __dirname + "uploads/";
+const UPLOAD_DESTINATION = __dirname + "/uploads/";
 const OLD_TRAINING_PATH = __dirname + "/rasa/default_training.yml";
 var upload = multer({ dest: UPLOAD_DESTINATION });
 
