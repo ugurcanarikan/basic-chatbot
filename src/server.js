@@ -3,6 +3,8 @@ const path = require('path');
 const rp = require('request-promise');
 const fs = require('fs');
 const request = require('request');
+const MongoClient = require('mongodb').MongoClient;
+
 
 const readXlsxFile = require('../node_modules/read-excel-file/node');
 const multer  = require('multer');
@@ -14,10 +16,13 @@ const app = express();
 const port = process.env.port || 3001;
 
 
-app.listen(port, async () => {
+app.listen(port, () => {
     console.log("Starting initial training");
-    await initialTraining();
-    console.log("Server listenning on port " + port);
+    initialTraining().then(() => {
+        console.log("Server listenning on port " + port);
+    }).catch(err => {
+        console.error(err);
+    });
 });
 
 app.get('/response/*', async (req, res) => {
@@ -26,9 +31,9 @@ app.get('/response/*', async (req, res) => {
     var flowValue = paramArray[1];
     var flowLenght = parseInt(paramArray[2]);
     var endOfFlow = true;
-    console.log("incoming message : " + message);
-    console.log("incoming flow value : " + flowValue);
-    console.log("incoming flow length : " + flowLenght);
+    console.log("Incoming message : " + message);
+    console.log("Incoming flow value : " + flowValue);
+    console.log("Incoming flow length : " + flowLenght);
     var flow = {value : ""};
     await getFlow(message, flow);
     var response = "";
@@ -98,7 +103,7 @@ app.get('/response/*', async (req, res) => {
 
 app.get('/flow/*', async (req, res) => {
     var message = req.params[0];
-    console.log("incoming message : " + message);
+    console.log("Incoming message : " + message);
     var flow = {value : null};
     await getFlow(message, flow);
     res.send({flow : flow.value});
@@ -111,16 +116,32 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
     })
 })
 
-app.post('/upload2/', async (req, res) => {
+app.post('/uploadd/',upload.single('file'), async (req, res) => {
     var file = {};
-    console.log(req.body);
+    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
+        var MongoClient = require('mongodb').MongoClient;
+        var url = "http://mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
+        console.log("Connecting to the database at " + url);
+        MongoClient.connect(url, function(err, db) {
+        if (err){console.error(err)};
+        var dbo = db.db("nlu"); 
+        dbo.collection("customers").insertMany(file, function(err, res) {
+            if (err) throw err;
+            console.log("New intents have been inserted to the database");
+            db.close();
+        });
+        });
+    }).then(() => {
+        res.send({statusCode: response.statusCode});
+    }).catch(err => {
+        console.error(err);
+    })
 })
 
 /**
  * Trains the nlu unit given the contents of the file
  * @param {*} file contents that the nlu will be trained with
  */
->>>>>>> bc9eba4827d33b5977b57517052cddbcf840ebe4
 async function train(file){
     res = {};
     var fileContents = "language: \"en\" \n\n";
@@ -147,14 +168,16 @@ async function train(file){
         };
         fileContents = fileContents + "    ]\n  \}\n}";
         fileContents = encode_utf8(fileContents);
+        console.log("Training file ready");
         return {text: fileContents};
     }).then(async s => {
+        console.log("Making train request to localhost:5000");
         await trainNLU(s).then(response => {
             if(response.statusCode === 200){
-                console.log("SUCCESS INITIAL TRAINING");
+                console.log("SUCCESS TRAINING");
             }
             else{
-                console.error("FAILED INITIAL TRAINING");
+                console.error("FAILED TRAINING");
             }
             res = {statusCode: response.statusCode};
             }).catch(err => {
@@ -176,7 +199,9 @@ async function initialTraining(){
     fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
     new Promise((resolve, reject) => {
         fs.readFile(OLD_TRAINING_PATH, "utf8", (err, data) => {
-            if(err) reject(err);
+            if(err){
+                reject(err);
+            }
             else{
                 resolve(data);
             }
@@ -185,8 +210,10 @@ async function initialTraining(){
         fileContents = fileContents + data;
         fileContents = fileContents + "    ]\n  \}\n}";
         fileContents = encode_utf8(fileContents);
+        console.log("Training file ready");
         return {text: fileContents};
     }).then(async s => {
+        console.log("Making train request to localhost:5000");
         await trainNLU(s).then(response => {
             if(response.statusCode === 200){
                 console.log("SUCCESS INITIAL TRAINING");
@@ -221,6 +248,7 @@ async function trainNLU(file){
         body: file.text,
         resolveWithFullResponse: true
     };
+    console.log("Awaiting response from localhost:5000/train");
     await rp(options).then(response => {
         console.log(response.body);
         res = response;
@@ -343,7 +371,7 @@ async function getCurrency(currency) {
  * @param {*} flow object to hold the determined flow 
  */
 async function askNLU(message, flow) {
-    var dataString = "{\"q\": \"" + message + "\", \"project\": \"current\"}";
+    var dataString = "{\"q\": \"" + message + "\", \"project\": \"current\", \"model\": \"nlu2\"}";
 
     console.log(dataString);
     var options = {
@@ -420,7 +448,7 @@ function readTextFile(file, s){
 function readFile(filePath, s){
     fs.readFile(filePath, {encoding: 'utf-8'}, function(err,data){
         if (!err) {
-            console.log('received data: ' + data);
+            console.log('Received data: ' + data);
             response.writeHead(200, {'Content-Type': 'text/html'});
             response.write(data);
             response.end();

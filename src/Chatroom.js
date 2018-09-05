@@ -4,9 +4,6 @@ import './App.css';
 
 import Message from './Message.js';
 import Axios from 'axios';
-const readXlsxFile = require('../node_modules/read-excel-file/node');
-
-
 
 class Chatroom extends React.Component {
     constructor(props) {
@@ -124,49 +121,10 @@ class Chatroom extends React.Component {
             return;
         }
         await this.say("I am starting my training now. Please wait", "bot");
-        Axios.post('/upload/', data, {
+        Axios.post('/uploadd/', data, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
-            }).then(async res => {
-                console.log(res);
-                if(res.data.statusCode === 200){
-                    this.say("I have completed my training", "bot");
-                }
-                else{
-                    await this.say("I could not complete my training due to an error on NLU." + 
-                    " To see a list of errors, open console by pressing F12", "bot");
-                }
-            }).catch(async err => {
-                await this.say("I could not complete my training." + 
-                    " To see a list of errors, open console by pressing F12", "bot");
-                console.log("Error uploading the file " + err);
-            });
-        
-    }
-
-    async submitUpload2(e){
-        e.preventDefault();
-        var file = {};
-        await readXlsxFile(this.uploadInput.files[0]).then((rows) => {
-            var numOfFields = rows[1].length;
-            for(let i = 0; i < rows.length - 2; i++){
-                file[i] = {};
-            }
-            for(let i = 2; i < rows.length; i++){
-                for(let j = 0; j < numOfFields; j++){
-                    file[i - 2][rows[1][j]] = rows[i][j];
-                }
-            }
-            }).catch(err => {
-                this.say("Error reading excel file", "bot");
-        });
-        await this.say("I am starting my training now. Please wait", "bot");
-        Axios.post('/upload2/', {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: file
             }).then(async res => {
                 console.log(res);
                 if(res.data.statusCode === 200){
@@ -200,7 +158,7 @@ class Chatroom extends React.Component {
                     <input type="text" ref="msg" />
                     <input type="submit" value="Submit" />
                 </form>
-                <form className="input" onSubmit={e => this.submitUpload2(e)}>
+                <form className="input" onSubmit={e => this.submitUpload(e)}>
                     <input ref={(ref) => { this.uploadInput = ref; }} type="file" name="file" />
                     <input type="submit" value="Upload" />
                 </form>
