@@ -111,13 +111,11 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
     })
 })
 
-<<<<<<< HEAD
 app.post('/upload2/', async (req, res) => {
     var file = {};
     console.log(req.body);
 })
 
-=======
 /**
  * Trains the nlu unit given the contents of the file
  * @param {*} file contents that the nlu will be trained with
