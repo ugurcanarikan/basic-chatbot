@@ -111,6 +111,11 @@ app.post('/upload/',upload.single('file'), async (req, res) => {
     })
 })
 
+app.post('/upload2/', async (req, res) => {
+    var file = {};
+    console.log(req.body);
+})
+
 async function train(file){
     res = {};
     var fileContents = "language: \"en\" \n\n";
@@ -195,7 +200,7 @@ async function trainNLU(file){
     var res = {};
     var options = { 
         method: 'POST',
-        url: 'http://localhost:5000/train?project=current',
+        url: 'http://localhost:5000/train?project=current&model=nlu2',
         qs: { project: 'current' },
         headers: 
         { 
