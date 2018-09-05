@@ -112,37 +112,53 @@ app.get('/flow/*', async (req, res) => {
 app.post('/upload/',upload.single('file'), async (req, res) => {
     var file = {};
     await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
-        await train(file).then(response => res.send(response));
+        await trainWithFile(file).then(response => res.send(response));
     })
 })
 
 app.post('/uploadd/',upload.single('file'), async (req, res) => {
     var file = {};
     await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
-        var MongoClient = require('mongodb').MongoClient;
-        var url = "http://mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
+        var url = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
         console.log("Connecting to the database at " + url);
         MongoClient.connect(url, function(err, db) {
         if (err){console.error(err)};
         var dbo = db.db("nlu"); 
-        dbo.collection("customers").insertMany(file, function(err, res) {
-            if (err) throw err;
-            console.log("New intents have been inserted to the database");
-            db.close();
+        new Promise((resolve, reject) => {
+            dbo.collection("Intents").insertMany(Object.values(file), function(err, res) {
+                if (err){
+                    reject(err);
+                }
+                else{ 
+                    console.log("New intents have been inserted to the database");
+                    resolve(dbo);
+                }
+            })}).then(dbo => {
+                dbo.collection("Intents").find({}, { projection: { _id: 0 } }).toArray(function(err, result) {
+                    if (err){
+                        reject(err);
+                    };
+                    console.log(result);
+                    db.close();
+                  });
+            })
         });
-        });
-    }).then(() => {
-        res.send({statusCode: response.statusCode});
+        res.send({statusCode: 200});
     }).catch(err => {
         console.error(err);
+        res.send({statusCode: 400});
     })
 })
+
+async function trainWithDatabase(db){
+
+}
 
 /**
  * Trains the nlu unit given the contents of the file
  * @param {*} file contents that the nlu will be trained with
  */
-async function train(file){
+async function trainWithFile(file){
     res = {};
     var fileContents = "language: \"en\" \n\n";
     fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
@@ -160,7 +176,7 @@ async function train(file){
     }).then(() => {
         var length = Object.keys(file).length;
         for(i = 0; i < length; i++){
-            var newIntent = "      {\n  " + "        \"text\": \"" + file[i].q + "\",\n  " + "        \"intent\": \"" + file[i].a + "\",\n  " + "        \"entities\": []\n        },\n  ";
+            var newIntent = "      {\n  " + "        \"text\": \"" + file[i].text + "\",\n  " + "        \"intent\": \"" + file[i].intent + "\",\n  " + "        \"entities\": []\n        },\n  ";
             fileContents = fileContents + newIntent;
             fs.appendFile(OLD_TRAINING_PATH, newIntent, err => {
                 if(err) console.error(err);
@@ -405,7 +421,7 @@ async function askNLU(message, flow) {
  *          questions | answers
  *          q1        | a1
  *          q2        | a2 
- * output: [{questions:q1, answers:a1}, {questions:q2, answers:a2}]
+ * output: {0:{questions:q1, answers:a1}, {questions:q2, answers:a2}]
  * @param {*} file file to hold the resulting array of objects
  * @param {*} location path of the xlsx file
  */
@@ -417,7 +433,10 @@ async function readExcel(file, location){
         }
         for(let i = 2; i < rows.length; i++){
             for(let j = 0; j < numOfFields; j++){
-                file[i - 2][rows[1][j]] = rows[i][j];
+                if(j == 0)
+                    file[i - 2]["text"] = rows[i][j];
+                else 
+                    file[i - 2]["intent"] = rows[i][j];
             }
         }
         }).catch(err => {
