@@ -18,7 +18,8 @@ const port = process.env.port || 3001;
 
 app.listen(port, () => {
     console.log("Starting initial training");
-    initialTraining().then(() => {
+    //initialTrainingWithFile().then(() => {
+    initialTrainingWithDatabase().then(() => {
         console.log("Server listenning on port " + port);
     }).catch(err => {
         console.error(err);
@@ -109,70 +110,115 @@ app.get('/flow/*', async (req, res) => {
     res.send({flow : flow.value});
 })
 
-app.post('/upload/',upload.single('file'), async (req, res) => {
+app.post('/uploadd/',upload.single('file'), async (req, res) => {
     var file = {};
     await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
-        await trainWithFile(file).then(response => res.send(response));
+        await trainWithFile(file).then(response => 
+          res.send(response));
     })
 })
 
-app.post('/uploadd/',upload.single('file'), async (req, res) => {
+app.post('/upload/',upload.single('file'), async (req, res) => {
     var file = {};
-    var ret = {};
-    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
-        var url = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
-        console.log("Connecting to the database at " + url);
-        MongoClient.connect(url, function(err, db) {
-        if (err){console.error(err)};
-        var dbo = db.db("nlu"); 
-        new Promise((resolve, reject) => {
-            dbo.collection("Intents").insertMany(Object.values(file), function(err, res) {
-                if (err){
-                    reject(err);
-                }
-                else{ 
-                    console.log("New intents have been inserted to the database");
-                    resolve(dbo);
-                }
-            })}).then(async dbo => {
-                var ret = {};
-                await dbo.collection("Intents").find({}, { projection: { _id: 0 } }).toArray()
-            .then(result => {
-                var fileContents = "language: \"en\" \n\n";
-                    fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
-                    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
-                    for(let i = 0; i < result.length; i++){
-                        fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
-                        fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
-                    }
-                    fileContents = fileContents + "    ]\n   }\n}";
-                    fileContents = encode_utf8(fileContents);
-                    console.log("Training file ready");
-                    console.log(fileContents);
-                    ret = {text: fileContents};
-                    return new Promise((resolve, reject) => {resolve(ret)});
-            }).then(async s => {
-                console.log("Making train request to localhost:5000");
-                await trainNLU(s).then(response => {
-                    if(response.statusCode === 200){
-                        console.log("SUCCESS TRAINING");
-                    }
-                    else{
-                        console.error("FAILED TRAINING");
-                    }
-                    res.send({statusCode: response.statusCode});
-                    }).catch(err => {
-                        console.error(err);
-                    });
-            }).catch(err => {
-                console.error(err);
-                reject(err);
-            }); 
-        })});
+    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
+        trainWithDatabase(file).then(response => {
+        res.send(response);
+      });
     }).catch(err => {
         console.error(err);
     })
 })
+
+async function trainWithDatabase(file){
+    var res = {};
+    var url = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
+    console.log("Connecting to the database at " + url);
+    await MongoClient.connect(url).then(async db => {
+        var dbo = db.db("nlu"); 
+        await new Promise((resolve, reject) => {
+            dbo.collection("Intents").insertMany(Object.values(file), function(err, res) {
+              if (err){
+                  reject(err);
+              }
+              else{ 
+                  console.log("New intents have been inserted to the database");
+                  resolve(dbo);
+              }
+            })
+        }).then(async dbo => {
+            var ret = {};
+            await dbo.collection("Intents").find({}, { projection: { _id: 0 } }).toArray().then(result => {
+                var fileContents = "language: \"en\" \n\n";
+                fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
+                fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+                for(let i = 0; i < result.length; i++){
+                    fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
+                    fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
+                }
+                fileContents = fileContents + "    ]\n   }\n}";
+                fileContents = encode_utf8(fileContents);
+                console.log("Training file ready");
+                ret = {text: fileContents};
+                return new Promise((resolve, reject) => {resolve(ret)});
+        }).then(async s => {
+            console.log("Making train request to localhost:5000");
+            await trainNLU(s).then(response => {
+                if(response.statusCode === 200){
+                    console.log("SUCCESS TRAINING");
+                }
+                else{
+                    console.error("FAILED TRAINING");
+                }
+                res = {statusCode: response.statusCode};
+            }).catch(err => {
+                console.error(err);
+            });
+        })
+    })}).catch(err => {
+      console.error(err);
+      reject(err);
+    });
+    return res;
+}
+
+async function initialTrainingWithDatabase(){
+    var url = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
+    console.log("Connecting to the database at " + url);
+    MongoClient.connect(url, async function(err, db) {
+    if (err){console.error(err)};
+    var dbo = db.db("nlu"); 
+    var ret = {};
+    await dbo.collection("Intents").find({}, { projection: { _id: 0 } }).toArray().then(result => {
+        var fileContents = "language: \"en\" \n\n";
+        fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
+        fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+        for(let i = 0; i < result.length; i++){
+            fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
+            fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
+        }
+        fileContents = fileContents + "    ]\n   }\n}";
+        fileContents = encode_utf8(fileContents);
+        console.log("Initial training file ready");
+        ret = {text: fileContents};
+        return new Promise((resolve, reject) => {resolve(ret)});
+        }).then(async s => {
+            console.log("Making train request to localhost:5000");
+            await trainNLU(s).then(response => {
+                if(response.statusCode === 200){
+                    console.log("SUCCESS INITIAL TRAINING");
+                }
+                else{
+                    console.error("FAILED INITIAL TRAINING");
+                }
+                }).catch(err => {
+                    console.error(err);
+                });
+        }).catch(err => {
+            console.error(err);
+            reject(err);
+        }); 
+    });
+}
 
 /**
  * Trains the nlu unit given the contents of the file
@@ -229,7 +275,7 @@ async function trainWithFile(file){
 /**
  * Starts the initial training of the nlu each time chatbot has started
  */
-async function initialTraining(){
+async function initialTrainingWithFile(){
     var fileContents = "language: \"en\" \n\n";
     fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
     fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
@@ -246,7 +292,7 @@ async function initialTraining(){
         fileContents = fileContents + data;
         fileContents = fileContents + "    ]\n   }\n}";
         fileContents = encode_utf8(fileContents);
-        console.log("Training file ready");
+        console.log("Initial training file ready");
         return {text: fileContents};
     }).then(async s => {
         console.log("Making train request to localhost:5000");
@@ -421,7 +467,7 @@ async function askNLU(message, flow) {
         console.log(b);
         return b;
     }).then(b => {
-        if (b.intent.confidence >= 0.25) {
+        if (b.intent.confidence >= 0.15) {
             flow.value = b.intent.name;
         }
     }).catch(err => {

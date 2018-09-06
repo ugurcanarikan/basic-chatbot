@@ -121,7 +121,7 @@ class Chatroom extends React.Component {
             return;
         }
         await this.say("I am starting my training now. Please wait", "bot");
-        Axios.post('/uploadd/', data, {
+        Axios.post('/upload/', data, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -160,7 +160,7 @@ class Chatroom extends React.Component {
                 </form>
                 <form className="input" onSubmit={e => this.submitUpload(e)}>
                     <input ref={(ref) => { this.uploadInput = ref; }} type="file" name="file" />
-                    <input type="submit" value="Upload" />
+                    <input type="submit" value="Train" />
                 </form>
             </div>
         );
