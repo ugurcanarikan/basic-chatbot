@@ -59,143 +59,13 @@ app.get('/response/*', async (req, res) => {
   var message = paramArray[0];
   var flowValue = paramArray[1];
   var flowLenght = parseInt(paramArray[2]);
-  var endOfFlow = true;
-  console.log("Incoming message : " + message);
-  console.log("Incoming flow value : " + flowValue);
-  console.log("Incoming flow length : " + flowLenght);
-
-  if(flowValue === "*"){
-    response = "Type *newProject to start creating a new project.";
-  }
-  else if (flowValue === "*newProject") {
-    switch (flowLenght) {
-      case 1:
-        response = "Project Name:";
-        endOfFlow = false;
-        break;
-      case 2:
-        newProject.projectName = message;
-        response = "Model Name:"
-        endOfFlow = false;
-        break;
-      case 3:
-        newProject.modelName = message;
-        response = "Database URL:";
-        endOfFlow = false;
-        break;
-      case 4:
-        newProject.dbURL = message;
-        response = "Database name:";
-        endOfFlow = false;
-        break;
-      case 5:
-        newProject.dbName = message;
-        response = "Collection name:";
-        endOfFlow = false;
-        break;
-      case 6:
-        newProject.collectionName = message;
-        await insertProject(newProject).then(res => {
-          switch(res.statusCode){
-            case 0:
-              response = "There was an error inserting new project.";
-              break;
-            case 1:
-              response = "New project has been successfully added";
-              break;
-            case 2:
-              response = "Another project already exists with the given data";
-              break;
-            default:
-              response = "There was an error inserting new project";
-          }
-        }).catch(err => {
-          console.error(err);
-          response = "There was an error inserting new project";
-        });
-        endOfFlow = true;
-        var newProject = {
-          projectName: null,
-          modelName: null,
-          dbURL: null,
-          dbName: null,
-          collectionName: null
-        };
-      default:
-        response = "There was an error inserting new project";
-    }
-    console.log(newProject);
-  }
-  else if (flowValue === "currency") {
-    var currency = {
-      eur: "",
-      usd: "",
-      code: 0
-    };
-    await getCurrency(currency);
-    if (currency.code === 200) {
-      response = "EUR/TL = " + currency.eur + " \n " +
-        "USD/TL = " + currency.usd + " \n ";
-    } else if (currency.code === 404) {
-      response = "Error while getting the currency exchange rates";
-    }
-  } 
-  else if (flowValue === "weather") {
-    switch (flowLenght) {
-      case 1:
-        response = "Which city would you like to know?";
-        endOfFlow = false;
-        break;
-      case 2:
-        var url = await getCityUrl(message);
-        var weather = {
-          city: message,
-          code: 0
-        };
-        await getWeather(url, weather);
-        if (weather.code === 200) {
-          response = "Weather in " + weather.city + " is " + weather.main + " with " +
-            weather.description + ". \nTemperature is " + weather.temp +
-            "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" +
-            "Pressure is " + weather.pressure + " bar";
-        } else if (weather.code === 404) {
-          response = "Error while getting the weather for " + message;
-        }
-    }
-  } 
-  else if (flowValue === "affirm") {
-    response = "Thanks";
-  } 
-  else if (flowValue === "greet") {
-    response = "Hi";
-  } 
-  else if (flowValue === "thank") {
-    response = "You are welcome";
-  } 
-  else if (flowValue === "smalltalk") {
-    response = "I'm fine, thanks";
-  } 
-  else if (flowValue === "goodbye") {
-    response = "goodbye"
-  } 
-  else if (flowValue === "frustration") {
-    response = "I am sorry I couldn't be more helpful"
-  } 
-  else if (flowValue === "insult") {
-    response = "That is not a nice thing to say";
-  } 
-  else if (flowValue !== null) {
-    response = flowValue;
-  } 
-  else {
-    response = "Cannot understand your message";
-  }
-  console.log("Determined response: " + response);
-  console.log("End of flow: " + endOfFlow);
-  console.log("************");
+  var endOfFlow = {value: true};
+  var response = {value: ""};
+  
+  await respond(flowValue, flowLenght, message, endOfFlow, response);
   res.send({
-    response: response,
-    endOfFlow: endOfFlow
+    response: response.value,
+    endOfFlow: endOfFlow.value
   });
 })
 
@@ -229,6 +99,143 @@ app.post('/upload/', upload.single('file'), async (req, res) => {
     console.error(err);
   })
 })
+
+async function respond(flowValue, flowLenght, message, endOfFlow, response){
+  console.log("Incoming message : " + message);
+  console.log("Incoming flow value : " + flowValue);
+  console.log("Incoming flow length : " + flowLenght);
+
+  if(flowValue === "*"){
+    response.value = "Type *newProject to start creating a new project.";
+  }
+  else if (flowValue === "*newProject") {
+    switch (flowLenght) {
+      case 1:
+        response.value = "Project Name:";
+        endOfFlow.value = false;
+        break;
+      case 2:
+        newProject.projectName = message;
+        response.value = "Model Name:"
+        endOfFlow.value = false;
+        break;
+      case 3:
+        newProject.modelName = message;
+        response.value = "Database URL:";
+        endOfFlow.value = false;
+        break;
+      case 4:
+        newProject.dbURL = message;
+        response.value = "Database name:";
+        endOfFlow.value = false;
+        break;
+      case 5:
+        newProject.dbName = message;
+        response.value = "Collection name:";
+        endOfFlow.value = false;
+        break;
+      case 6:
+        newProject.collectionName = message;
+        await insertProject(newProject).then(res => {
+          switch(res.statusCode){
+            case 0:
+              response.value = "There was an error inserting new project - 0";
+              break;
+            case 1:
+              response.value = "New project has been successfully added";
+              break;
+            case 2:
+              response.value = "Another project already exists with the given data";
+              break;
+            default:
+              response.value = "There was an error inserting new project - default6";
+          }
+          newProject = {
+            projectName: null,
+            modelName: null,
+            dbURL: null,
+            dbName: null,
+            collectionName: null
+          };
+        }).catch(err => {
+          console.error(err);
+          response.value = "There was an error inserting new project - error";
+        });
+        endOfFlow.value = true;
+        break;
+      default:
+        response.value = "There was an error inserting new project - default";
+    }
+  }
+  else if (flowValue === "currency") {
+    var currency = {
+      eur: "",
+      usd: "",
+      code: 0
+    };
+    await getCurrency(currency);
+    if (currency.code === 200) {
+      response.value = "EUR/TL = " + currency.eur + " \n " +
+        "USD/TL = " + currency.usd + " \n ";
+    } else if (currency.code === 404) {
+      response.value = "Error while getting the currency exchange rates";
+    }
+  } 
+  else if (flowValue === "weather") {
+    switch (flowLenght) {
+      case 1:
+        response.value = "Which city would you like to know?";
+        endOfFlow.value = false;
+        break;
+      case 2:
+        var url = await getCityUrl(message);
+        var weather = {
+          city: message,
+          code: 0
+        };
+        await getWeather(url, weather);
+        if (weather.code === 200) {
+          response.value = "Weather in " + weather.city + " is " + weather.main + " with " +
+            weather.description + ". \nTemperature is " + weather.temp +
+            "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" +
+            "Pressure is " + weather.pressure + " bar";
+        } else if (weather.code === 404) {
+          response.value = "Error while getting the weather for " + message;
+        }
+    }
+  } 
+  else if (flowValue === "affirm") {
+    response.value = "Thanks";
+  } 
+  else if (flowValue === "greet") {
+    response.value = "Hi";
+  } 
+  else if (flowValue === "thank") {
+    response.value = "You are welcome";
+  } 
+  else if (flowValue === "smalltalk") {
+    response.value = "I'm fine, thanks";
+  } 
+  else if (flowValue === "goodbye") {
+    response.value = "goodbye"
+  } 
+  else if (flowValue === "frustration") {
+    response.value = "I am sorry I couldn't be more helpful"
+  } 
+  else if (flowValue === "insult") {
+    response.value = "That is not a nice thing to say";
+  } 
+  else if (flowValue !== null) {
+    response.value = flowValue;
+  } 
+  else {
+    response.value = "Cannot understand your message";
+  }
+
+  console.log("Determined response: " + response.value);
+  console.log("End of flow: " + endOfFlow.value);
+  console.log("************");
+}
 
 async function trainWithDatabase(file) {
   var res = {};
@@ -444,16 +451,20 @@ async function insertProject(project) {
     dbName: project.dbName,
     collectionName: project.collectionName
   }
+  console.log("Connecting to " + PROJECTS_DB_URL);
   await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
     var dbo = db.db(PROJECTS_DB_NAME);
-    dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(result => {
-      if(result){
+    await dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(async result => {
+      if(result.length !== 0){
+        console.log("Duplicate identified");
         response.statusCode = 2;
       }
       else{
-        dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(project).then((db, err) => {
+        await dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(project).then((db, err) => {
           if(err){
+            console.log("Error while inserting new project");
             response.statusCode = 0;
+            console.error(err);
           }
           else{
             response.statusCode = 1;
