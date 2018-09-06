@@ -15,11 +15,23 @@ var upload = multer({ dest: UPLOAD_DESTINATION });
 const app = express();
 const port = process.env.port || 3001;
 
+const PROJECTS_DB_URL = "mongodb://vca:Abc1234!@ds245132.mlab.com:45132/projects";
+const PROJECTS_DB_NAME = "projects";
+const PROJECTS_COLLECTION_NAME = "Projects";
+
 var dbURL = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
 var dbName = "nlu";
 var collectionName = "Intents";
 var projectName = "current";
 var modelName = "nlu2";
+
+var defaultProject = {
+  projectName: projectName,
+  modelName: modelName,
+  dbURL: dbURL,
+  dbName: dbName,
+  collectionName: collectionName
+}
 
 
 app.listen(port, () => {
@@ -41,6 +53,40 @@ app.get('/response/*', async (req, res) => {
     console.log("Incoming message : " + message);
     console.log("Incoming flow value : " + flowValue);
     console.log("Incoming flow length : " + flowLenght);
+
+    if(message === "/newProject"){
+      var newProject = {};
+      switch(flowLenght){
+        case 1:
+          response = "Welcome to the new project console.\nProject Name:";
+          endOfFlow = false;
+          break;
+        case 2:
+          newProject.projectName = message;
+          response = "Model Name:"
+          endOfFlow = false;
+          break;
+        case 3:
+          newProject.modelName = message;
+          response = "Database URL:";
+          endOfFlow = false;
+          break;
+        case 4:
+          newProject.dbURL = message;
+          response = "Database name:";
+          endOfFlow = false;
+          break;
+        case 5:
+          newProject.dbName = message;
+          response = "Collection name:";
+          endOfFlow = false;
+          break;
+        case 6:
+          newProject.collectionName = message;
+          endOfFlow = true;
+      }
+    }
+
     var flow = {value : ""};
     await getFlow(message, flow);
     var response = "";
@@ -56,11 +102,12 @@ app.get('/response/*', async (req, res) => {
         }
     }
     else if(flowValue === "weather"){
-        if(flowLenght === 1){
+        switch(flowLenght){
+          case 1:
             response = "Which city would you like to know?";
             endOfFlow = false;
-        }
-        else if(flowLenght === 2){
+        
+          case 2:
             var url = await getCityUrl(message);
             var weather = {city: message, code: 0};
             await getWeather(url, weather);
@@ -316,33 +363,48 @@ async function initialTrainingWithFile(){
     }); 
 }
 
+async function insertProject(project){
+  await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
+    var dbo = db.db(PROJECTS_DB_NAME); 
+    dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(Object.values(project), function(err, res) {
+      if (err){
+          console.error(err);
+      }
+      else{ 
+          console.log("New project have been inserted to the database");
+      }
+    })
+  })
+}
+
 /**
  * Makes the request that trains the nlu given the training file
  * @param {*} file file that holds the contents that the nlu will be trained
  */
 async function trainNLU(file){
-    file.text = encode_utf8(file.text);
-    var res = {};
-    var options = { 
-        method: 'POST',
-        url: 'http://localhost:5000/train?project=' + projectName + '&model=' + modelName,
-        qs: { project: projectName },
-        headers: 
-        { 
-            'Cache-Control': 'no-cache',
-            'Content-Type': 'application/x-yml' },
-        body: file.text,
-        resolveWithFullResponse: true
-    };
-    console.log("Awaiting response from localhost:5000/train");
-    await rp(options).then(response => {
-        console.log(response.body);
-        res = response;
-        return response;
-    }).catch(err => {
-        console.error(err);
-    })
-    return res;
+  file.text = encode_utf8(file.text);
+  var res = {};
+  var options = { 
+    method: 'POST',
+    url: 'http://localhost:5000/train?project=' + projectName + '&model=' + modelName,
+    qs: { project: projectName },
+    headers: 
+    { 
+      'Cache-Control': 'no-cache',
+      'Content-Type': 'application/x-yml' 
+    },
+    body: file.text,
+    resolveWithFullResponse: true
+  };
+  console.log("Awaiting response from localhost:5000/train");
+  await rp(options).then(response => {
+    console.log(response.body);
+    res = response;
+    return response;
+  }).catch(err => {
+    console.error(err);
+  })
+  return res;
 }
 
 /**
@@ -351,9 +413,9 @@ async function trainNLU(file){
  * @param {*} flow object to hold the determined flow
  */
 async function getFlow(message, flow){
-    console.log("Determining the flow of the message");
-    await askNLU(message, flow);
-    console.log("Determined Flow : " + flow.value);
+  console.log("Determining the flow of the message");
+  await askNLU(message, flow);
+  console.log("Determined Flow : " + flow.value);
 }
 
 /**
@@ -361,12 +423,12 @@ async function getFlow(message, flow){
  * @param {*} message message of the user which is expected to be a city
  */
 function getCityUrl(message) {
-    var city = message.charAt(0).toUpperCase() + message.slice(1);
-    city = city.replace(/\s+/g, '');
-    var url = 'http://api.openweathermap.org/data/2.5/weather?q=' + city +
-        '&appid=' + 'd46ce5a0f44a100b614bde2f94a11c15';
+  var city = message.charAt(0).toUpperCase() + message.slice(1);
+  city = city.replace(/\s+/g, '');
+  var url = 'http://api.openweathermap.org/data/2.5/weather?q=' + city +
+      '&appid=' + 'd46ce5a0f44a100b614bde2f94a11c15';
 
-    return url;
+  return url;
 }
 
 /**
@@ -375,47 +437,47 @@ function getCityUrl(message) {
  * @param {*} weather object to hold the weather stats
  */
 async function getWeather(url, weather) {
-    console.log("Connecting to " + url + " to get the weather");
-    await rp(url).then(body => {
-        var b = JSON.parse(body);
-        weather.code = 200;
-        weather.main = b.weather[0].main;
-        weather.description = b.weather[0].description;
-        weather.temp = b.main.temp - 273.15;
-        weather.humidity = b.main.humidity;
-        weather.pressure = b.main.pressure;
-    }).catch((err) => {
-        weather.code = 404;
-        console.error("Error getting the weather in the getWeather function in customActions.js")
-        console.error(err);
-    });
+  console.log("Connecting to " + url + " to get the weather");
+  await rp(url).then(body => {
+    var b = JSON.parse(body);
+    weather.code = 200;
+    weather.main = b.weather[0].main;
+    weather.description = b.weather[0].description;
+    weather.temp = b.main.temp - 273.15;
+    weather.humidity = b.main.humidity;
+    weather.pressure = b.main.pressure;
+  }).catch((err) => {
+    weather.code = 404;
+    console.error("Error getting the weather in the getWeather function in customActions.js")
+    console.error(err);
+  });
 }
 
 function getDateTime() {
-    var date = new Date();
-    var hour = date.getHours();
-    hour = (hour < 10 ? "0" : "") + hour;
-    var min = date.getMinutes();
-    min = (min < 10 ? "0" : "") + min;
-    var sec = date.getSeconds();
-    sec = (sec < 10 ? "0" : "") + sec;
-    var year = date.getFullYear();
-    var month = date.getMonth() + 1;
-    month = (month < 10 ? "0" : "") + month;
-    var day = date.getDate();
-    day = (day < 10 ? "0" : "") + day;
-    return year + ":" + month + ":" + day + ":" + hour + ":" + min + ":" + sec;
+  var date = new Date();
+  var hour = date.getHours();
+  hour = (hour < 10 ? "0" : "") + hour;
+  var min = date.getMinutes();
+  min = (min < 10 ? "0" : "") + min;
+  var sec = date.getSeconds();
+  sec = (sec < 10 ? "0" : "") + sec;
+  var year = date.getFullYear();
+  var month = date.getMonth() + 1;
+  month = (month < 10 ? "0" : "") + month;
+  var day = date.getDate();
+  day = (day < 10 ? "0" : "") + day;
+  return year + ":" + month + ":" + day + ":" + hour + ":" + min + ":" + sec;
 }
 
 function getDate() {
-    var date = new Date();
-    var year = date.getFullYear();
-    var month = date.getMonth() + 1;
-    month = (month < 10 ? "0" : "") + month;
-    var day = date.getDate();
-    day = (day < 10 ? "0" : "") + day;
-    day = day - 1;
-    return year + "-" + month + "-" + day;
+  var date = new Date();
+  var year = date.getFullYear();
+  var month = date.getMonth() + 1;
+  month = (month < 10 ? "0" : "") + month;
+  var day = date.getDate();
+  day = (day < 10 ? "0" : "") + day;
+  day = day - 1;
+  return year + "-" + month + "-" + day;
 }
 
 /**
@@ -423,32 +485,32 @@ function getDate() {
  * @param {*} currency to hold the currency rates
  */
 async function getCurrency(currency) {
-    var url = "http://free.currencyconverterapi.com/api/v5/convert?q=EUR_TRY&compact=y";
-    console.log("Connecting to " + url + " to get EUR exchange rates");
-    await rp(url).then(body => {
-        var b = JSON.parse(body);
-        return b;
-    }).then(b => {
-        currency.code = 200;
-        currency.eur = b.EUR_TRY.val;
-        console.log("1 euro = " + currency.eur);
-    }).catch(err => {
-        currency.code = 404;
-        console.error(err);
-    });
-    var url2 = "http://free.currencyconverterapi.com/api/v5/convert?q=USD_TRY&compact=y";
-    console.log("Connecting to " + url2 + " to get USD exchange rates");
-    await rp(url2).then(body => {
-        var b = JSON.parse(body);
-        return b;
-    }).then(b => {
-        currency.code = 200;
-        currency.usd = b.USD_TRY.val;
-        console.log("1 dollar = " + currency.usd);
-    }).catch(err => {
-        currency.code = 404;
-        console.error(err);
-    });
+  var url = "http://free.currencyconverterapi.com/api/v5/convert?q=EUR_TRY&compact=y";
+  console.log("Connecting to " + url + " to get EUR exchange rates");
+  await rp(url).then(body => {
+    var b = JSON.parse(body);
+    return b;
+  }).then(b => {
+    currency.code = 200;
+    currency.eur = b.EUR_TRY.val;
+    console.log("1 euro = " + currency.eur);
+  }).catch(err => {
+    currency.code = 404;
+    console.error(err);
+  });
+  var url2 = "http://free.currencyconverterapi.com/api/v5/convert?q=USD_TRY&compact=y";
+  console.log("Connecting to " + url2 + " to get USD exchange rates");
+  await rp(url2).then(body => {
+    var b = JSON.parse(body);
+    return b;
+  }).then(b => {
+    currency.code = 200;
+    currency.usd = b.USD_TRY.val;
+    console.log("1 dollar = " + currency.usd);
+  }).catch(err => {
+    currency.code = 404;
+    console.error(err);
+  });
 }
 
 /**
@@ -457,26 +519,26 @@ async function getCurrency(currency) {
  * @param {*} flow object to hold the determined flow 
  */
 async function askNLU(message, flow) {
-    var dataString = "{\"q\": \"" + message + "\", \"project\": \"" + projectName + "\", \"model\": \"" + modelName + "\"}";
+  var dataString = "{\"q\": \"" + message + "\", \"project\": \"" + projectName + "\", \"model\": \"" + modelName + "\"}";
 
-    console.log(dataString);
-    var options = {
-        url: 'http://localhost:5000/parse',
-        method: 'POST',
-        body: dataString,
-        //resolveWithFullResponse: true
-    };
-    await rp(options).then(body => {
-        var b = JSON.parse(body);
-        console.log(b);
-        return b;
-    }).then(b => {
-        if (b.intent.confidence >= 0.15) {
-            flow.value = b.intent.name;
-        }
-    }).catch(err => {
-        console.error(err);
-    });
+  console.log(dataString);
+  var options = {
+    url: 'http://localhost:5000/parse',
+    method: 'POST',
+    body: dataString,
+    //resolveWithFullResponse: true
+  };
+  await rp(options).then(body => {
+    var b = JSON.parse(body);
+    console.log(b);
+    return b;
+  }).then(b => {
+    if (b.intent.confidence >= 0.15) {
+        flow.value = b.intent.name;
+    }
+  }).catch(err => {
+    console.error(err);
+  });
 }
 
 /**
@@ -496,22 +558,22 @@ async function askNLU(message, flow) {
  * @param {*} location path of the xlsx file
  */
 async function readExcel(file, location){
-    await readXlsxFile(location).then((rows) => {
-        var numOfFields = rows[1].length;
-        for(let i = 0; i < rows.length - 2; i++){
-            file[i] = {};
-        }
-        for(let i = 2; i < rows.length; i++){
-            for(let j = 0; j < numOfFields; j++){
-                if(j == 0)
-                    file[i - 2]["text"] = rows[i][j];
-                else 
-                    file[i - 2]["intent"] = rows[i][j];
-            }
-        }
-        }).catch(err => {
-            console.error("Error reading excel file: " + err);
-    })
+  await readXlsxFile(location).then((rows) => {
+    var numOfFields = rows[1].length;
+    for(let i = 0; i < rows.length - 2; i++){
+        file[i] = {};
+    }
+    for(let i = 2; i < rows.length; i++){
+      for(let j = 0; j < numOfFields; j++){
+        if(j == 0)
+          file[i - 2]["text"] = rows[i][j];
+        else 
+          file[i - 2]["intent"] = rows[i][j];
+      }
+    }
+    }).catch(err => {
+      console.error("Error reading excel file: " + err);
+  })
 }
 
 function encode_utf8( s ){
