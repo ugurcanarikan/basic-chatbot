@@ -57,7 +57,7 @@ class Chatroom extends React.Component {
     async submitMessage(e) {
         e.preventDefault();
         const message = ReactDOM.findDOMNode(this.refs.msg).value;
-        if(this.state.flow.value === null){
+        if(this.state.flow.value === null && this.state.flow.length === 0){
             await this.callFlowAPI(message);
         }
         await this.say(message, "user")

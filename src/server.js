@@ -7,10 +7,12 @@ const MongoClient = require('mongodb').MongoClient;
 
 
 const readXlsxFile = require('../node_modules/read-excel-file/node');
-const multer  = require('multer');
+const multer = require('multer');
 const UPLOAD_DESTINATION = __dirname + "/uploads/";
 const OLD_TRAINING_PATH = __dirname + "/rasa/default_training.yml";
-var upload = multer({ dest: UPLOAD_DESTINATION });
+var upload = multer({
+  dest: UPLOAD_DESTINATION
+});
 
 const app = express();
 const port = process.env.port || 3001;
@@ -33,365 +35,453 @@ var defaultProject = {
   collectionName: collectionName
 }
 
+var newProject = {
+  projectName: null,
+  modelName: null,
+  dbURL: null,
+  dbName: null,
+  collectionName: null
+};
+
 
 app.listen(port, () => {
-    console.log("Starting initial training");
-    //initialTrainingWithFile().then(() => {
-    initialTrainingWithDatabase().then(() => {
-        console.log("Server listenning on port " + port);
-    }).catch(err => {
-        console.error(err);
-    });
+  console.log("Starting initial training");
+  //initialTrainingWithFile().then(() => {
+  initialTrainingWithDatabase().then(() => {
+    console.log("Server listenning on port " + port);
+  }).catch(err => {
+    console.error(err);
+  });
 });
 
 app.get('/response/*', async (req, res) => {
-    var paramArray = req.params[0].split('&');
-    var message = paramArray[0];
-    var flowValue = paramArray[1];
-    var flowLenght = parseInt(paramArray[2]);
-    var endOfFlow = true;
-    console.log("Incoming message : " + message);
-    console.log("Incoming flow value : " + flowValue);
-    console.log("Incoming flow length : " + flowLenght);
+  var paramArray = req.params[0].split('&');
+  var message = paramArray[0];
+  var flowValue = paramArray[1];
+  var flowLenght = parseInt(paramArray[2]);
+  var endOfFlow = true;
+  console.log("Incoming message : " + message);
+  console.log("Incoming flow value : " + flowValue);
+  console.log("Incoming flow length : " + flowLenght);
 
-    if(message === "/newProject"){
-      var newProject = {};
-      switch(flowLenght){
-        case 1:
-          response = "Welcome to the new project console.\nProject Name:";
-          endOfFlow = false;
-          break;
-        case 2:
-          newProject.projectName = message;
-          response = "Model Name:"
-          endOfFlow = false;
-          break;
-        case 3:
-          newProject.modelName = message;
-          response = "Database URL:";
-          endOfFlow = false;
-          break;
-        case 4:
-          newProject.dbURL = message;
-          response = "Database name:";
-          endOfFlow = false;
-          break;
-        case 5:
-          newProject.dbName = message;
-          response = "Collection name:";
-          endOfFlow = false;
-          break;
-        case 6:
-          newProject.collectionName = message;
-          endOfFlow = true;
-      }
+  if(flowValue === "*"){
+    response = "Type *newProject to start creating a new project.";
+  }
+  else if (flowValue === "*newProject") {
+    switch (flowLenght) {
+      case 1:
+        response = "Project Name:";
+        endOfFlow = false;
+        break;
+      case 2:
+        newProject.projectName = message;
+        response = "Model Name:"
+        endOfFlow = false;
+        break;
+      case 3:
+        newProject.modelName = message;
+        response = "Database URL:";
+        endOfFlow = false;
+        break;
+      case 4:
+        newProject.dbURL = message;
+        response = "Database name:";
+        endOfFlow = false;
+        break;
+      case 5:
+        newProject.dbName = message;
+        response = "Collection name:";
+        endOfFlow = false;
+        break;
+      case 6:
+        newProject.collectionName = message;
+        await insertProject(newProject).then(res => {
+          switch(res.statusCode){
+            case 0:
+              response = "There was an error inserting new project.";
+              break;
+            case 1:
+              response = "New project has been successfully added";
+              break;
+            case 2:
+              response = "Another project already exists with the given data";
+              break;
+            default:
+              response = "There was an error inserting new project";
+          }
+        }).catch(err => {
+          console.error(err);
+          response = "There was an error inserting new project";
+        });
+        endOfFlow = true;
+        var newProject = {
+          projectName: null,
+          modelName: null,
+          dbURL: null,
+          dbName: null,
+          collectionName: null
+        };
+      default:
+        response = "There was an error inserting new project";
     }
-
-    var flow = {value : ""};
-    await getFlow(message, flow);
-    var response = "";
-    if(flowValue === "currency"){
-        var currency = {eur : "", usd : "", code : 0};
-        await getCurrency(currency);
-        if(currency.code === 200){
-            response = "EUR/TL = " + currency.eur + " \n " + 
-                      "USD/TL = " + currency.usd + " \n " ;
+    console.log(newProject);
+  }
+  else if (flowValue === "currency") {
+    var currency = {
+      eur: "",
+      usd: "",
+      code: 0
+    };
+    await getCurrency(currency);
+    if (currency.code === 200) {
+      response = "EUR/TL = " + currency.eur + " \n " +
+        "USD/TL = " + currency.usd + " \n ";
+    } else if (currency.code === 404) {
+      response = "Error while getting the currency exchange rates";
+    }
+  } 
+  else if (flowValue === "weather") {
+    switch (flowLenght) {
+      case 1:
+        response = "Which city would you like to know?";
+        endOfFlow = false;
+        break;
+      case 2:
+        var url = await getCityUrl(message);
+        var weather = {
+          city: message,
+          code: 0
+        };
+        await getWeather(url, weather);
+        if (weather.code === 200) {
+          response = "Weather in " + weather.city + " is " + weather.main + " with " +
+            weather.description + ". \nTemperature is " + weather.temp +
+            "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" +
+            "Pressure is " + weather.pressure + " bar";
+        } else if (weather.code === 404) {
+          response = "Error while getting the weather for " + message;
         }
-        else if(currency.code === 404){
-            response = "Error while getting the currency exchange rates";
-        }
     }
-    else if(flowValue === "weather"){
-        switch(flowLenght){
-          case 1:
-            response = "Which city would you like to know?";
-            endOfFlow = false;
-        
-          case 2:
-            var url = await getCityUrl(message);
-            var weather = {city: message, code: 0};
-            await getWeather(url, weather);
-            if(weather.code === 200){
-                response = "Weather in " + weather.city + " is " + weather.main + " with " +
-                    weather.description + ". \nTemperature is " + weather.temp + 
-                    "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" + 
-                    "Pressure is " + weather.pressure + " bar";
-            }
-            else if(weather.code === 404){
-                response = "Error while getting the weather for " + message;
-            }
-        }
-    }
-    else if(flowValue === "affirm"){
-        response = "Thanks";
-    }
-    else if(flowValue === "greet"){
-        response = "Hi";
-    }
-    else if(flowValue === "thank"){
-        response = "You are welcome";
-    }
-    else if(flowValue === "smalltalk"){
-        response = "I'm fine, thanks";
-    }
-    else if(flowValue === "goodbye"){
-        response = "goodbye"
-    }
-    else if(flowValue === "frustration"){
-        response = "I am sorry I couldn't be more helpful"
-    }
-    else if(flowValue === "insult"){
-        response = "That is not a nice thing to say";
-    }
-    else if(flowValue !== null){
-        response = flowValue;
-    }
-    else{
-        response = "Cannot understand your message";
-    }
-    console.log("Determined response: " + response);
-    console.log("End of flow: " + endOfFlow);
-    console.log("************");
-    res.send({response : response, endOfFlow: endOfFlow});
+  } 
+  else if (flowValue === "affirm") {
+    response = "Thanks";
+  } 
+  else if (flowValue === "greet") {
+    response = "Hi";
+  } 
+  else if (flowValue === "thank") {
+    response = "You are welcome";
+  } 
+  else if (flowValue === "smalltalk") {
+    response = "I'm fine, thanks";
+  } 
+  else if (flowValue === "goodbye") {
+    response = "goodbye"
+  } 
+  else if (flowValue === "frustration") {
+    response = "I am sorry I couldn't be more helpful"
+  } 
+  else if (flowValue === "insult") {
+    response = "That is not a nice thing to say";
+  } 
+  else if (flowValue !== null) {
+    response = flowValue;
+  } 
+  else {
+    response = "Cannot understand your message";
+  }
+  console.log("Determined response: " + response);
+  console.log("End of flow: " + endOfFlow);
+  console.log("************");
+  res.send({
+    response: response,
+    endOfFlow: endOfFlow
+  });
 })
 
 app.get('/flow/*', async (req, res) => {
-    var message = req.params[0];
-    console.log("Incoming message : " + message);
-    var flow = {value : null};
-    await getFlow(message, flow);
-    res.send({flow : flow.value});
+  var message = req.params[0];
+  console.log("Incoming message : " + message);
+  var flow = {
+    value: null
+  };
+  await getFlow(message, flow);
+  res.send({
+    flow: flow.value
+  });
 })
 
-app.post('/uploadd/',upload.single('file'), async (req, res) => {
-    var file = {};
-    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
-        await trainWithFile(file).then(response => 
-          res.send(response));
-    })
+app.post('/uploadd/', upload.single('file'), async (req, res) => {
+  var file = {};
+  await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(async () => {
+    await trainWithFile(file).then(response =>
+      res.send(response));
+  })
 })
 
-app.post('/upload/',upload.single('file'), async (req, res) => {
-    var file = {};
-    await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
-        trainWithDatabase(file).then(response => {
-        res.send(response);
-      });
-    }).catch(err => {
-        console.error(err);
-    })
-})
-
-async function trainWithDatabase(file){
-    var res = {};
-    console.log("Connecting to the database at " + dbURL);
-    await MongoClient.connect(dbURL).then(async db => {
-        var dbo = db.db(dbName); 
-        await new Promise((resolve, reject) => {
-            dbo.collection(collectionName).insertMany(Object.values(file), function(err, res) {
-              if (err){
-                  reject(err);
-              }
-              else{ 
-                  console.log("New intents have been inserted to the database");
-                  resolve(dbo);
-              }
-            })
-        }).then(async dbo => {
-            var ret = {};
-            await dbo.collection(collectionName).find({}, { projection: { _id: 0 } }).toArray().then(result => {
-                var fileContents = "language: \"en\" \n\n";
-                fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
-                fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
-                for(let i = 0; i < result.length; i++){
-                    fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
-                    fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
-                }
-                fileContents = fileContents + "    ]\n   }\n}";
-                fileContents = encode_utf8(fileContents);
-                console.log("Training file ready");
-                ret = {text: fileContents};
-                return new Promise((resolve, reject) => {resolve(ret)});
-        }).then(async s => {
-            console.log("Making train request to localhost:5000");
-            await trainNLU(s).then(response => {
-                if(response.statusCode === 200){
-                    console.log("SUCCESS TRAINING");
-                }
-                else{
-                    console.error("FAILED TRAINING");
-                }
-                res = {statusCode: response.statusCode};
-            }).catch(err => {
-                console.error(err);
-            });
-        })
-    })}).catch(err => {
-      console.error(err);
-      reject(err);
+app.post('/upload/', upload.single('file'), async (req, res) => {
+  var file = {};
+  await readExcel(file, UPLOAD_DESTINATION + "/" + req.file.filename).then(() => {
+    trainWithDatabase(file).then(response => {
+      res.send(response);
     });
-    return res;
-}
+  }).catch(err => {
+    console.error(err);
+  })
+})
 
-async function initialTrainingWithDatabase(){
-    console.log("Connecting to the database at " + dbURL);
-    MongoClient.connect(dbURL, async function(err, db) {
-    if (err){console.error(err)};
-    var dbo = db.db(dbName); 
-    var ret = {};
-    await dbo.collection(collectionName).find({}, { projection: { _id: 0 } }).toArray().then(result => {
+async function trainWithDatabase(file) {
+  var res = {};
+  console.log("Connecting to the database at " + dbURL);
+  await MongoClient.connect(dbURL).then(async db => {
+    var dbo = db.db(dbName);
+    await new Promise((resolve, reject) => {
+      dbo.collection(collectionName).insertMany(Object.values(file), function(err, res) {
+        if (err) {
+          reject(err);
+        } else {
+          console.log("New intents have been inserted to the database");
+          resolve(dbo);
+        }
+      })
+    }).then(async dbo => {
+      var ret = {};
+      await dbo.collection(collectionName).find({}, {
+        projection: {
+          _id: 0
+        }
+      }).toArray().then(result => {
         var fileContents = "language: \"en\" \n\n";
-        fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
+        fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n";
         fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
-        for(let i = 0; i < result.length; i++){
-            fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
-            fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
+        for (let i = 0; i < result.length; i++) {
+          fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
+          fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
         }
         fileContents = fileContents + "    ]\n   }\n}";
         fileContents = encode_utf8(fileContents);
-        console.log("Initial training file ready");
-        ret = {text: fileContents};
-        return new Promise((resolve, reject) => {resolve(ret)});
-        }).then(async s => {
-            console.log("Making train request to localhost:5000");
-            await trainNLU(s).then(response => {
-                if(response.statusCode === 200){
-                    console.log("SUCCESS INITIAL TRAINING");
-                }
-                else{
-                    console.error("FAILED INITIAL TRAINING");
-                }
-                }).catch(err => {
-                    console.error(err);
-                });
+        console.log("Training file ready");
+        ret = {
+          text: fileContents
+        };
+        return new Promise((resolve, reject) => {
+          resolve(ret)
+        });
+      }).then(async s => {
+        console.log("Making train request to localhost:5000");
+        await trainNLU(s).then(response => {
+          if (response.statusCode === 200) {
+            console.log("SUCCESS TRAINING");
+          } else {
+            console.error("FAILED TRAINING");
+          }
+          res = {
+            statusCode: response.statusCode
+          };
         }).catch(err => {
-            console.error(err);
-            reject(err);
-        }); 
+          console.error(err);
+        });
+      })
+    })
+  }).catch(err => {
+    console.error(err);
+    reject(err);
+  });
+  return res;
+}
+
+async function initialTrainingWithDatabase() {
+  console.log("Connecting to the database at " + dbURL);
+  MongoClient.connect(dbURL, async function(err, db) {
+    if (err) {
+      console.error(err)
+    };
+    var dbo = db.db(dbName);
+    var ret = {};
+    await dbo.collection(collectionName).find({}, {
+      projection: {
+        _id: 0
+      }
+    }).toArray().then(result => {
+      var fileContents = "language: \"en\" \n\n";
+      fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n";
+      fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+      for (let i = 0; i < result.length; i++) {
+        fileContents = fileContents + "      {\n        \"text\": \"" + result[i].text + "\",\n";
+        fileContents = fileContents + "        \"intent\": \"" + result[i].intent + "\"\n      },\n";
+      }
+      fileContents = fileContents + "    ]\n   }\n}";
+      fileContents = encode_utf8(fileContents);
+      console.log("Initial training file ready");
+      ret = {
+        text: fileContents
+      };
+      return new Promise((resolve, reject) => {
+        resolve(ret)
+      });
+    }).then(async s => {
+      console.log("Making train request to localhost:5000");
+      await trainNLU(s).then(response => {
+        if (response.statusCode === 200) {
+          console.log("SUCCESS INITIAL TRAINING");
+        } 
+        else {
+          console.error("FAILED INITIAL TRAINING");
+        }
+      }).catch(err => {
+        console.error(err);
+      });
+    }).catch(err => {
+      console.error(err);
+      reject(err);
     });
+  });
 }
 
 /**
  * Trains the nlu unit given the contents of the file
  * @param {*} file contents that the nlu will be trained with
  */
-async function trainWithFile(file){
-    res = {};
-    var fileContents = "language: \"en\" \n\n";
-    fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
-    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
-    await new Promise((resolve, reject) => {
-        fs.readFile(OLD_TRAINING_PATH, "utf8", (err, data) => {
-            if(err) reject(err);
-            else{
-                resolve(data);
-            }
-        });
-    }).then(data => {
-        fileContents = fileContents + data;
-        fileContents = encode_utf8(fileContents);
-    }).then(() => {
-        var length = Object.keys(file).length;
-        for(i = 0; i < length; i++){
-            var newIntent = "      {\n  " + "        \"text\": \"" + file[i].text + "\",\n  " + "        \"intent\": \"" + file[i].intent + "\",\n  " + "        \"entities\": []\n        },\n  ";
-            fileContents = fileContents + newIntent;
-            fs.appendFile(OLD_TRAINING_PATH, newIntent, err => {
-                if(err) console.error(err);
-            });
-        };
-        fileContents = fileContents + "    ]\n   }\n}";
-        fileContents = encode_utf8(fileContents);
-        console.log("Training file ready");
-        return {text: fileContents};
-    }).then(async s => {
-        console.log("Making train request to localhost:5000");
-        await trainNLU(s).then(response => {
-            if(response.statusCode === 200){
-                console.log("SUCCESS TRAINING");
-            }
-            else{
-                console.error("FAILED TRAINING");
-            }
-            res = {statusCode: response.statusCode};
-            }).catch(err => {
-                console.error(err);
-            });
+async function trainWithFile(file) {
+  res = {};
+  var fileContents = "language: \"en\" \n\n";
+  fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n";
+  fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+  await new Promise((resolve, reject) => {
+    fs.readFile(OLD_TRAINING_PATH, "utf8", (err, data) => {
+      if (err) reject(err);
+      else {
+        resolve(data);
+      }
+    });
+  }).then(data => {
+    fileContents = fileContents + data;
+    fileContents = encode_utf8(fileContents);
+  }).then(() => {
+    var length = Object.keys(file).length;
+    for (i = 0; i < length; i++) {
+      var newIntent = "      {\n  " + "        \"text\": \"" + file[i].text + "\",\n  " + "        \"intent\": \"" + file[i].intent + "\",\n  " + "        \"entities\": []\n        },\n  ";
+      fileContents = fileContents + newIntent;
+      fs.appendFile(OLD_TRAINING_PATH, newIntent, err => {
+        if (err) console.error(err);
+      });
+    };
+    fileContents = fileContents + "    ]\n   }\n}";
+    fileContents = encode_utf8(fileContents);
+    console.log("Training file ready");
+    return {
+      text: fileContents
+    };
+  }).then(async s => {
+    console.log("Making train request to localhost:5000");
+    await trainNLU(s).then(response => {
+      if (response.statusCode === 200) {
+        console.log("SUCCESS TRAINING");
+      } else {
+        console.error("FAILED TRAINING");
+      }
+      res = {
+        statusCode: response.statusCode
+      };
     }).catch(err => {
-        console.error(err);
-        reject(err);
-    }); 
-    return res;
+      console.error(err);
+    });
+  }).catch(err => {
+    console.error(err);
+    reject(err);
+  });
+  return res;
 }
 
 /**
  * Starts the initial training of the nlu each time chatbot has started
  */
-async function initialTrainingWithFile(){
-    var fileContents = "language: \"en\" \n\n";
-    fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n" ;
-    fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
-    new Promise((resolve, reject) => {
-        fs.readFile(OLD_TRAINING_PATH, "utf8", (err, data) => {
-            if(err){
-                reject(err);
-            }
-            else{
-                resolve(data);
-            }
-        });
-    }).then(data => {
-        fileContents = fileContents + data;
-        fileContents = fileContents + "    ]\n   }\n}";
-        fileContents = encode_utf8(fileContents);
-        console.log("Initial training file ready");
-        return {text: fileContents};
-    }).then(async s => {
-        console.log("Making train request to localhost:5000");
-        await trainNLU(s).then(response => {
-            if(response.statusCode === 200){
-                console.log("SUCCESS INITIAL TRAINING");
-            }
-            else{
-                console.error("FAILED INITIAL TRAINING");
-            }
-            }).catch(err => {
-                console.error(err);
-            });
-    }).catch(err => {
-        console.error(err);
+async function initialTrainingWithFile() {
+  var fileContents = "language: \"en\" \n\n";
+  fileContents = fileContents + "pipeline: \"spacy_sklearn\"\n\n";
+  fileContents = fileContents + "data: {\n  \"rasa_nlu_data\": {\n    \"common_examples\": [\n";
+  new Promise((resolve, reject) => {
+    fs.readFile(OLD_TRAINING_PATH, "utf8", (err, data) => {
+      if (err) {
         reject(err);
-    }); 
+      } 
+      else {
+        resolve(data);
+      }
+    });
+  }).then(data => {
+    fileContents = fileContents + data;
+    fileContents = fileContents + "    ]\n   }\n}";
+    fileContents = encode_utf8(fileContents);
+    console.log("Initial training file ready");
+    return {
+      text: fileContents
+    };
+  }).then(async s => {
+    console.log("Making train request to localhost:5000");
+    await trainNLU(s).then(response => {
+      if (response.statusCode === 200) {
+        console.log("SUCCESS INITIAL TRAINING");
+      } 
+      else {
+        console.error("FAILED INITIAL TRAINING");
+      }
+    }).catch(err => {
+      console.error(err);
+    });
+  }).catch(err => {
+    console.error(err);
+    reject(err);
+  });
 }
 
-async function insertProject(project){
+async function insertProject(project) {
+  var response = {};
+  var query = {
+    projectName: project.projectName,
+    modelName: project.modelName,
+    dbURL: project.dbURL,
+    dbName: project.dbName,
+    collectionName: project.collectionName
+  }
   await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
-    var dbo = db.db(PROJECTS_DB_NAME); 
-    dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(Object.values(project), function(err, res) {
-      if (err){
-          console.error(err);
+    var dbo = db.db(PROJECTS_DB_NAME);
+    dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(result => {
+      if(result){
+        response.statusCode = 2;
       }
-      else{ 
-          console.log("New project have been inserted to the database");
+      else{
+        dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(project).then((db, err) => {
+          if(err){
+            response.statusCode = 0;
+          }
+          else{
+            response.statusCode = 1;
+            console.log("New project has been added to the database");
+          }
+        });
       }
-    })
-  })
+    });
+  });
+  return response;
 }
 
 /**
  * Makes the request that trains the nlu given the training file
  * @param {*} file file that holds the contents that the nlu will be trained
  */
-async function trainNLU(file){
+async function trainNLU(file) {
   file.text = encode_utf8(file.text);
   var res = {};
-  var options = { 
+  var options = {
     method: 'POST',
     url: 'http://localhost:5000/train?project=' + projectName + '&model=' + modelName,
-    qs: { project: projectName },
-    headers: 
-    { 
+    qs: {
+      project: projectName
+    },
+    headers: {
       'Cache-Control': 'no-cache',
-      'Content-Type': 'application/x-yml' 
+      'Content-Type': 'application/x-yml'
     },
     body: file.text,
     resolveWithFullResponse: true
@@ -412,9 +502,14 @@ async function trainNLU(file){
  * @param {*} message message of the user
  * @param {*} flow object to hold the determined flow
  */
-async function getFlow(message, flow){
+async function getFlow(message, flow) {
   console.log("Determining the flow of the message");
-  await askNLU(message, flow);
+  if(message.charAt(0) === "*"){
+    flow.value = message;
+  }
+  else{
+    await askNLU(message, flow);
+  }
   console.log("Determined Flow : " + flow.value);
 }
 
@@ -426,7 +521,7 @@ function getCityUrl(message) {
   var city = message.charAt(0).toUpperCase() + message.slice(1);
   city = city.replace(/\s+/g, '');
   var url = 'http://api.openweathermap.org/data/2.5/weather?q=' + city +
-      '&appid=' + 'd46ce5a0f44a100b614bde2f94a11c15';
+    '&appid=' + 'd46ce5a0f44a100b614bde2f94a11c15';
 
   return url;
 }
@@ -534,7 +629,7 @@ async function askNLU(message, flow) {
     return b;
   }).then(b => {
     if (b.intent.confidence >= 0.15) {
-        flow.value = b.intent.name;
+      flow.value = b.intent.name;
     }
   }).catch(err => {
     console.error(err);
@@ -557,56 +652,57 @@ async function askNLU(message, flow) {
  * @param {*} file file to hold the resulting array of objects
  * @param {*} location path of the xlsx file
  */
-async function readExcel(file, location){
+async function readExcel(file, location) {
   await readXlsxFile(location).then((rows) => {
     var numOfFields = rows[1].length;
-    for(let i = 0; i < rows.length - 2; i++){
-        file[i] = {};
+    for (let i = 0; i < rows.length - 2; i++) {
+      file[i] = {};
     }
-    for(let i = 2; i < rows.length; i++){
-      for(let j = 0; j < numOfFields; j++){
-        if(j == 0)
+    for (let i = 2; i < rows.length; i++) {
+      for (let j = 0; j < numOfFields; j++) {
+        if (j == 0)
           file[i - 2]["text"] = rows[i][j];
-        else 
+        else
           file[i - 2]["intent"] = rows[i][j];
       }
     }
-    }).catch(err => {
-      console.error("Error reading excel file: " + err);
+  }).catch(err => {
+    console.error("Error reading excel file: " + err);
   })
 }
 
-function encode_utf8( s ){
-    return unescape( encodeURIComponent( s ) );
-}( '\u4e0a\u6d77' )
+function encode_utf8(s) {
+  return unescape(encodeURIComponent(s));
+}('\u4e0a\u6d77')
 
-function readTextFile(file, s){
-    var rawFile = new XMLHttpRequest();
-    rawFile.open("GET", file, false);
-    rawFile.onreadystatechange = function ()
-    {
-        if(rawFile.readyState === 4)
-        {
-            if(rawFile.status === 200 || rawFile.status == 0)
-            {
-                var allText = rawFile.responseText;
-                s.text = allText;
-            }
-        }
+function readTextFile(file, s) {
+  var rawFile = new XMLHttpRequest();
+  rawFile.open("GET", file, false);
+  rawFile.onreadystatechange = function() {
+    if (rawFile.readyState === 4) {
+      if (rawFile.status === 200 || rawFile.status == 0) {
+        var allText = rawFile.responseText;
+        s.text = allText;
+      }
     }
-    rawFile.send(null);
-}
-function readFile(filePath, s){
-    fs.readFile(filePath, {encoding: 'utf-8'}, function(err,data){
-        if (!err) {
-            console.log('Received data: ' + data);
-            response.writeHead(200, {'Content-Type': 'text/html'});
-            response.write(data);
-            response.end();
-        } else {
-            console.error(err);
-        }
-    });
+  }
+  rawFile.send(null);
 }
 
-
+function readFile(filePath, s) {
+  fs.readFile(filePath, {
+    encoding: 'utf-8'
+  }, function(err, data) {
+    if (!err) {
+      console.log('Received data: ' + data);
+      response.writeHead(200, {
+        'Content-Type': 'text/html'
+      });
+      response.write(data);
+      response.end();
+    } 
+    else {
+      console.error(err);
+    }
+  });
+}
