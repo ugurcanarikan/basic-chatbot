@@ -237,29 +237,49 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
       response.value = "Error while getting the currency exchange rates";
     }
   } 
-  else if (flowValue === "weather") {
-    switch (flowLenght) {
-      case 1:
-        response.value = "Which city would you like to know?";
-        endOfFlow.value = false;
-        break;
-      case 2:
-        var url = await getCityUrl(message);
-        var weather = {
-          city: message,
-          code: 0
-        };
-        await getWeather(url, weather);
-        if (weather.code === 200) {
-          response.value = "Weather in " + weather.city + " is " + weather.main + " with " +
-            weather.description + ". Temperature is " + weather.temp +
-            "Celcius. " + "Humidity is " + weather.humidity + " % . " +
-            "Pressure is " + weather.pressure + " bar";
-        } else if (weather.code === 404) {
-          response.value = "Error while getting the weather for " + message;
-        }
+  else if (flowValue === "weather"){
+    if( !(message !== "weather" && message.substring(0,7) === "weather")){
+      switch (flowLenght) {
+        case 1:
+          response.value = "Which city would you like to know?";
+          endOfFlow.value = false;
+          break;
+        case 2:
+          var url = await getCityUrl(message);
+          var weather = {
+            city: message,
+            code: 0
+          };
+          await getWeather(url, weather);
+          if (weather.code === 200) {
+            response.value = "Weather in " + weather.city + " is " + weather.main + " with " +
+              weather.description + ". Temperature is " + weather.temp +
+              "Celcius. " + "Humidity is " + weather.humidity + " % . " +
+              "Pressure is " + weather.pressure + " bar";
+          } else if (weather.code === 404) {
+            response.value = "Error while getting the weather for " + message;
+          }
+      }
+    }
+    else if (message !== "weather" && message.substring(0,7) === "weather") {
+      var city = message.substring(8);
+      var url = await getCityUrl(city);
+      var weather = {
+        city: message,
+        code: 0
+      };
+      await getWeather(url, weather);
+      if (weather.code === 200) {
+        response.value = "Weather in " + weather.city + " is " + weather.main + " with " +
+          weather.description + ". Temperature is " + weather.temp +
+          "Celcius. " + "Humidity is " + weather.humidity + " % . " +
+          "Pressure is " + weather.pressure + " bar";
+      } else if (weather.code === 404) {
+        response.value = "Error while getting the weather for " + message;
+      }
     }
   } 
+  
   else if (flowValue === "affirm") {
     response.value = "Thanks";
   } 
@@ -550,15 +570,15 @@ async function listProjects(){
     await dbo.collection(PROJECTS_COLLECTION_NAME).find().toArray().then(async result => {
       for(let i = 0; i < result.length; i++){
         if(i === 0)
-          response.value = "id: " + result[i]._id.oid;
+          response.value = "id: " + result[i]._id.oid + ". ";
         else
-          response.value += "id: " + result[i]._id.oid;
-        response.value += "project name: " + result[i].projectName;
-        response.value += "model name: " + result[i].modelName;
-        response.value += "database url: " + result[i].dbURL;
-        response.value += "database name: " + result[i].dbName;
-        response.value += "collection name: " + result[i].collectionName;
-        response.value += "description: " + result[i].description;
+          response.value += "id: " + result[i]._id.oid + ". ";
+        response.value += "project name: " + result[i].projectName + ". ";
+        response.value += "model name: " + result[i].modelName + ". ";
+        response.value += "database url: " + result[i].dbURL + ". ";
+        response.value += "database name: " + result[i].dbName + ". ";
+        response.value += "collection name: " + result[i].collectionName + ". ";
+        response.value += "description: " + result[i].description + ". ";
       }
     })
   })
