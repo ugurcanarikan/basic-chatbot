@@ -17,12 +17,12 @@ var upload = multer({
 const app = express();
 const port = process.env.port || 3001;
 
-const PROJECTS_DB_URL = "mongodb://<username>:<password>@ds245132.mlab.com:45132/projects";
+const PROJECTS_DB_URL = "mongodb://vca:Abc1234!@ds245132.mlab.com:45132/projects";
 const PROJECTS_DB_NAME = "projects";
 const PROJECTS_COLLECTION_NAME = "Projects";
 
 var dbId = (1).toString(16)
-var dbURL = "mongodb://<username>:<password>@ds135952.mlab.com:35952/nlu";
+var dbURL = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
 var dbName = "nlu";
 var collectionName = "Intents";
 var projectName = "current";
@@ -49,6 +49,8 @@ var newProject = {
   collectionName: null,
   description: null
 };
+
+var deleteID;
 
 
 app.listen(port, () => {
@@ -113,7 +115,8 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
   console.log("Incoming flow length : " + flowLenght);
 
   if(flowValue === "*"){
-    response.value = "Type *newProject to start creating a new project.";
+    response.value = "*newProject: Add new project, *listProjects: list projects, *switchProject: switch current project ";
+    response.value += "*getProject: get information about a project, *deleteProject: delete a project";
   }
   else if (flowValue === "*newProject") {
     switch (flowLenght) {
@@ -222,6 +225,83 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
         response.value = "Error switching project";
       }
     })
+  }
+  else if(flowValue === "*getProject"){
+    switch(flowLenght){
+      case 1:
+        response.value = "Which project would you like to get?";
+        endOfFlow.value = false;
+        break;
+      case 2:
+        await getProject({oid: message}).then(res => {
+          if(res.statusCode === 0){
+            response.value = "No project found with the given id";
+          }
+          else if(res.statusCode === 1){
+            response.value = res.value;
+          }
+        }).catch(err => {
+          console.error(err);
+          response.value = "Error getting the project";
+        })
+    }
+  }
+  else if(flowValue.substring(0,11) === "*getProject"){
+    await getProject({oid: message.substring(12)}).then(res => {
+      if(res.statusCode === 0){
+        response.value = "No project found with the given id";
+      }
+      else if(res.statusCode === 1){
+        response.value = res.value;
+      }
+    }).catch(err => {
+      console.error(err);
+      response.value = "Error getting the project";
+    })
+  }
+  else if(flowValue === "*deleteProject"){
+    console.log(deleteID);
+    switch(flowLenght){
+      case 1:
+        response.value = "Which project would you like to delete?";
+        endOfFlow.value = false;
+        break;
+      case 2:
+        await getProject({oid: message}).then(res => {
+          if(res.statusCode === 0){
+            response.value = "No project found with the given id";
+          }
+          else if(res.statusCode === 1){
+            deleteID = message;
+            response.value = "Are you sure you want to delete the project: " + res.value + "  Press Y or N";
+          }
+        });
+        endOfFlow.value = false;
+        break;
+      case 3:
+        if(message.toUpperCase() === "Y"){
+          await deleteProject({oid: deleteID}).then(res => {
+            if(res.statusCode === 0){
+              response.value = "No project found with the given id";
+            }
+            else if(res.statusCode === -1){
+              response.value = "Error deleting the project - error";
+            }
+            else if(res.statusCode === 1){
+              response.value = "Project deleted successfully";
+            }
+          }).catch(err => {
+            console.error(err);
+            response.value = "Error while deleting the project";
+          })
+        }
+        else{
+          response.value = "Project not deleted";
+        }
+        break;
+      default:
+        response.value = "Error while deleting the project - default";
+    }
   }
   else if (flowValue === "currency") {
     var currency = {
@@ -616,6 +696,62 @@ async function switchProject(id){
         });
       }
     })
+  })
+  return res;
+}
+
+async function getProject(id){
+  var response = {};
+  var query = {_id: id};
+  console.log("Connecting to " + PROJECTS_DB_URL);
+  await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
+    var dbo = db.db(PROJECTS_DB_NAME);
+    await dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(async result => {
+      if(result.length === 0){
+        response.statusCode = 0;
+      }
+      else{
+        response.statusCode = 1;
+        response.value = "id: " + result[0]._id.oid + ". ";
+        response.value += "project name: " + result[0].projectName + ". ";
+        response.value += "model name: " + result[0].modelName + ". ";
+        response.value += "database url: " + result[0].dbURL + ". ";
+        response.value += "database name: " + result[0].dbName + ". ";
+        response.value += "collection name: " + result[0].collectionName + ". ";
+        response.value += "description: " + result[0].description + ". ";
+      }
+    })
+  }).catch(err => {
+    console.error(err);
+  })
+  return response;
+}
+
+async function deleteProject(id){
+  var res = {};
+  var query = {_id: id};
+  console.log("Connecting to " + PROJECTS_DB_URL);
+  await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
+    var dbo = db.db(PROJECTS_DB_NAME);
+    await dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(async result => {
+      if(result.length === 0){
+        res.statusCode = 0;
+      }
+      else{
+        await dbo.collection(PROJECTS_COLLECTION_NAME).deleteOne(query).then((db, err) => {
+          if(err){
+            console.error(err);
+            res.statusCode = -1;
+          }
+          else{
+            res.statusCode = 1;
+            console.log("Document deleted");
+          }
+        })
+      }
+    })
+  }).catch(err => {
+    console.error(err);
   })
   return res;
 }
