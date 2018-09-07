@@ -21,18 +21,24 @@ const PROJECTS_DB_URL = "mongodb://vca:Abc1234!@ds245132.mlab.com:45132/projects
 const PROJECTS_DB_NAME = "projects";
 const PROJECTS_COLLECTION_NAME = "Projects";
 
+var dbId = (1).toString(16)
 var dbURL = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
 var dbName = "nlu";
 var collectionName = "Intents";
 var projectName = "current";
 var modelName = "nlu2";
+var description = "default project for the chatbot";
 
 var defaultProject = {
+  _id: {
+    oid: dbId
+  },
   projectName: projectName,
   modelName: modelName,
   dbURL: dbURL,
   dbName: dbName,
-  collectionName: collectionName
+  collectionName: collectionName,
+  description: description
 }
 
 var newProject = {
@@ -136,6 +142,11 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
         break;
       case 6:
         newProject.collectionName = message;
+        response.value = "Description:";
+        endOfFlow.value = false;
+        break;
+      case 7:
+        newProject.description = message;
         await insertProject(newProject).then(res => {
           switch(res.statusCode){
             case 0:
@@ -161,11 +172,15 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
           console.error(err);
           response.value = "There was an error inserting new project - error";
         });
-        endOfFlow.value = true;
         break;
       default:
         response.value = "There was an error inserting new project - default";
     }
+  }
+  else if(flowValue === "*listProjects"){
+    await listProjects().then(res => {
+      response.value = res.value;
+    })
   }
   else if (flowValue === "currency") {
     var currency = {
@@ -196,8 +211,8 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
         await getWeather(url, weather);
         if (weather.code === 200) {
           response.value = "Weather in " + weather.city + " is " + weather.main + " with " +
-            weather.description + ". \nTemperature is " + weather.temp +
-            "Celcius. \n" + "Humidity is " + weather.humidity + " % . \n" +
+            weather.description + ". Temperature is " + weather.temp +
+            "Celcius. " + "Humidity is " + weather.humidity + " % . " +
             "Pressure is " + weather.pressure + " bar";
         } else if (weather.code === 404) {
           response.value = "Error while getting the weather for " + message;
@@ -460,20 +475,47 @@ async function insertProject(project) {
         response.statusCode = 2;
       }
       else{
-        await dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(project).then((db, err) => {
-          if(err){
-            console.log("Error while inserting new project");
-            response.statusCode = 0;
-            console.error(err);
-          }
-          else{
-            response.statusCode = 1;
-            console.log("New project has been added to the database");
-          }
+        await dbo.collection(PROJECTS_COLLECTION_NAME).find().count().then(async count => {
+          var id = count + 1;
+          project._id = {oid: id.toString(16)};
+          await dbo.collection(PROJECTS_COLLECTION_NAME).insertOne(project).then((db, err) => {
+            if(err){
+              console.log("Error while inserting new project");
+              response.statusCode = 0;
+              console.error(err);
+            }
+            else{
+              response.statusCode = 1;
+              console.log("New project has been added to the database");
+            }
+          });
         });
       }
     });
   });
+  return response;
+}
+
+async function listProjects(){
+  var response = {};
+  console.log("Connecting to " + PROJECTS_DB_URL);
+  await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
+    var dbo = db.db(PROJECTS_DB_NAME);
+    await dbo.collection(PROJECTS_COLLECTION_NAME).find().toArray().then(async result => {
+      for(let i = 0; i < result.length; i++){
+        if(i === 0)
+          response.value = "id: " + result[i]._id.oid;
+        else
+          response.value += "id: " + result[i]._id.oid;
+        response.value += "project name: " + result[i].projectName;
+        response.value += "model name: " + result[i].modelName;
+        response.value += "database url: " + result[i].dbURL;
+        response.value += "database name: " + result[i].dbName;
+        response.value += "collection name: " + result[i].collectionName;
+        response.value += "description: " + result[i].description;
+      }
+    })
+  })
   return response;
 }
 
@@ -717,3 +759,4 @@ function readFile(filePath, s) {
     }
   });
 }
+
