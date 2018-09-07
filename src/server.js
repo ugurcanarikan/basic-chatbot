@@ -46,7 +46,8 @@ var newProject = {
   modelName: null,
   dbURL: null,
   dbName: null,
-  collectionName: null
+  collectionName: null,
+  description: null
 };
 
 
@@ -122,31 +123,37 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
         break;
       case 2:
         newProject.projectName = message;
+        console.log("Project name: " + newProject.projectName);
         response.value = "Model Name:"
         endOfFlow.value = false;
         break;
       case 3:
         newProject.modelName = message;
+        console.log("Model name: " + newProject.modelName);
         response.value = "Database URL:";
         endOfFlow.value = false;
         break;
       case 4:
-        newProject.dbURL = message;
+        newProject.dbURL = message.substring(0,8) + "/" + message.substring(8);
+        console.log("Database URL: " + newProject.dbURL);
         response.value = "Database name:";
         endOfFlow.value = false;
         break;
       case 5:
         newProject.dbName = message;
+        console.log("Database name: " + newProject.dbName);
         response.value = "Collection name:";
         endOfFlow.value = false;
         break;
       case 6:
         newProject.collectionName = message;
+        console.log("Collection name: " + newProject.collectionName);
         response.value = "Description:";
         endOfFlow.value = false;
         break;
       case 7:
         newProject.description = message;
+        console.log("Description: " + newProject.description);
         await insertProject(newProject).then(res => {
           switch(res.statusCode){
             case 0:
@@ -180,6 +187,40 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
   else if(flowValue === "*listProjects"){
     await listProjects().then(res => {
       response.value = res.value;
+    })
+  }
+  else if(flowValue === "*switchProject"){
+    switch(flowLenght){
+      case 1:
+        response.value = "Enter the id of the project you want to switch to";
+        endOfFlow.value = false;
+        break;
+      case 2:
+        await switchProject({oid: message}).then(res => {
+          if (res.statusCode === 0){
+            response.value = "There is no project with the given id";
+          }
+          else if(res.statusCode === 200){
+            response.value = "Switched to the project " + message;
+          }
+          else{
+            response.value = "Error switching project";
+          }
+        })
+    }
+  }
+  else if(flowValue.substring(0, 14) === "*switchProject"){
+    var id = message.substring(15);
+    await switchProject({oid: id}).then(res => {
+      if (res.statusCode === 0){
+        response.value = "There is no project with the given id";
+      }
+      else if(res.statusCode === 200){
+        response.value = "Switched to the project " + id;
+      }
+      else{
+        response.value = "Error switching project";
+      }
     })
   }
   else if (flowValue === "currency") {
@@ -313,8 +354,9 @@ async function trainWithDatabase(file) {
 }
 
 async function initialTrainingWithDatabase() {
+  var res = {};
   console.log("Connecting to the database at " + dbURL);
-  MongoClient.connect(dbURL, async function(err, db) {
+  await MongoClient.connect(dbURL).then(async function(db, err) {
     if (err) {
       console.error(err)
     };
@@ -346,6 +388,7 @@ async function initialTrainingWithDatabase() {
       await trainNLU(s).then(response => {
         if (response.statusCode === 200) {
           console.log("SUCCESS INITIAL TRAINING");
+          res.statusCode = 200;
         } 
         else {
           console.error("FAILED INITIAL TRAINING");
@@ -358,6 +401,7 @@ async function initialTrainingWithDatabase() {
       reject(err);
     });
   });
+  return res;
 }
 
 /**
@@ -492,6 +536,8 @@ async function insertProject(project) {
         });
       }
     });
+  }).catch(err => {
+    console.error(err);
   });
   return response;
 }
@@ -517,6 +563,41 @@ async function listProjects(){
     })
   })
   return response;
+}
+
+async function switchProject(id){
+  var res = {};
+  var query = {_id: id};
+  console.log("Connecting to " + PROJECTS_DB_URL);
+  await MongoClient.connect(PROJECTS_DB_URL).then(async db => {
+    var dbo = db.db(PROJECTS_DB_NAME);
+    await dbo.collection(PROJECTS_COLLECTION_NAME).find(query).toArray().then(async result => {
+      if(result.length === 0){
+        res.statusCode = 0;
+      }
+      else{
+        dbId = id.oid;
+        projectName = result[0].projectName;
+        modelName = result[0].modelName;
+        dbURL = result[0].dbURL;
+        dbName = result[0].dbName;
+        collectionName = result[0].collectionName;
+        description = result[0].description;
+        console.log("id: " + dbId);
+        console.log("project name: " + projectName);
+        console.log("model name: " + modelName);
+        console.log("database url: " + dbURL);
+        console.log("database name: " + dbName);
+        console.log("collection name: " + collectionName);
+        console.log("description: " + description);
+        console.log("Starting the training for the project id: " + dbId);
+        await initialTrainingWithDatabase().then(response => {
+          res.statusCode = response.statusCode;
+        });
+      }
+    })
+  })
+  return res;
 }
 
 /**
@@ -546,6 +627,7 @@ async function trainNLU(file) {
     return response;
   }).catch(err => {
     console.error(err);
+    console.error(file.text);
   })
   return res;
 }
