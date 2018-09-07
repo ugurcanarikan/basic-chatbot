@@ -1,4 +1,6 @@
 # Simple Chatbot
+A simple chatbot to communicate on various topics and to be trained.
+
 * Front-end was written with ```React.js``` and listens port:3000
 * Back-end was written with ```Node.js v8.11.3``` and listes port:3001
 * Simple NLU unit listens port:5000 to evaluate flow of the incomming messages. NLU used in the project [rasa_nlu](https://github.com/RasaHQ/rasa_nlu) 
@@ -29,7 +31,7 @@ Also, a database to store intents is also required. [mlab](https://mlab.com) was
     desctiption: description
 }
 ```
-Project name is the name of the rasa project, modelName is the name of the rasa model and the rest is url of your database, name of your database, name of the collection that the intents to train rasa_nlu will be taken and description of the project. You also need to modify those inside server.js as default parameters.
+Project name is the name of the rasa project, modelName is the name of the rasa model and the rest is url of your database, name of your database, name of the collection that the intents to train rasa_nlu will be taken from and description of the project. You also need to modify those inside server.js as default parameters.
 
 After installing and running rasa_nlu and setting up a database, you are ready to run the chatbot.
 
@@ -39,4 +41,4 @@ npm run dev
 ```
 in order to run the chatbot. This command will run both server and client side concurrently. Server side will be on port 3001 while server side will be on port 3000.
 
-The chatbot will be initially trained and run with the database you specified. Typing ```*``` or ```*help``` on the chatbot, you may get more help.
+The chatbot will be initially trained and run with the intents from the database you specified. You may now train your bot or add new projects. Typing ```*``` or ```*help``` on the chatbot, you may get more help.
