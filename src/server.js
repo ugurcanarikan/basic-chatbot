@@ -17,12 +17,12 @@ var upload = multer({
 const app = express();
 const port = process.env.port || 3001;
 
-const PROJECTS_DB_URL = "mongodb://vca:Abc1234!@ds245132.mlab.com:45132/projects";
+const PROJECTS_DB_URL = "mongodb://<username>:<password>@ds245132.mlab.com:45132/projects";
 const PROJECTS_DB_NAME = "projects";
 const PROJECTS_COLLECTION_NAME = "Projects";
 
 var dbId = (1).toString(16)
-var dbURL = "mongodb://vca:Abc1234!@ds135952.mlab.com:35952/nlu";
+var dbURL = "mongodb://<username>:<password>@ds135952.mlab.com:35952/nlu";
 var dbName = "nlu";
 var collectionName = "Intents";
 var projectName = "current";
