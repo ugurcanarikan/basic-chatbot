@@ -260,7 +260,6 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
     })
   }
   else if(flowValue === "*deleteProject"){
-    console.log(deleteID);
     switch(flowLenght){
       case 1:
         response.value = "Which project would you like to delete?";
@@ -299,6 +298,45 @@ async function respond(flowValue, flowLenght, message, endOfFlow, response){
           response.value = "Project not deleted";
         }
         break;
+      default:
+        response.value = "Error while deleting the project - default";
+    }
+  }
+  else if(flowValue.substring(0,14) === "*deleteProject"){
+    switch(flowLenght){
+        case 1:
+          await getProject({oid: message.substring(15)}).then(res => {
+            if(res.statusCode === 0){
+              response.value = "No project found with the given id";
+            }
+            else if(res.statusCode === 1){
+              deleteID = message.substring(15);
+              response.value = "Are you sure you want to delete the project: " + res.value + "  Press Y or N";
+            }
+          });
+          endOfFlow.value = false;
+          break;
+        case 2:
+          if(message.toUpperCase() === "Y"){
+            await deleteProject({oid: deleteID}).then(res => {
+              if(res.statusCode === 0){
+                response.value = "No project found with the given id";
+              }
+              else if(res.statusCode === -1){
+                response.value = "Error deleting the project - error";
+              }
+              else if(res.statusCode === 1){
+                response.value = "Project deleted successfully";
+              }
+            }).catch(err => {
+              console.error(err);
+              response.value = "Error while deleting the project";
+            })
+          }
+          else{
+            response.value = "Project not deleted";
+          }
+          break;
       default:
         response.value = "Error while deleting the project - default";
     }
@@ -778,7 +816,7 @@ async function trainNLU(file) {
   };
   console.log("Awaiting response from localhost:5000/train");
   await rp(options).then(response => {
-    console.log(response.body);
+    //console.log(response.body);
     res = response;
     return response;
   }).catch(err => {
@@ -916,7 +954,7 @@ async function askNLU(message, flow) {
   };
   await rp(options).then(body => {
     var b = JSON.parse(body);
-    console.log(b);
+    //console.log(b);
     return b;
   }).then(b => {
     if (b.intent.confidence >= 0.15) {
